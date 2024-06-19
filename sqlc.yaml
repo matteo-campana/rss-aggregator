@@ -1,0 +1,8 @@
+version: "2"
+sql:
+  - schema: "backend/rss-aggregatorsql/schema"
+    queries: "backend/rss-aggregatorsql/queries"
+    engine: "postgresql"
+    gen:
+      go:
+        out: "backend/rss-aggregatorinternal/database"
