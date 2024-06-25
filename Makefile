@@ -67,6 +67,13 @@ migrate-down:
 	 postgres://$(DB_USERNAME):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_DATABASE)?sslmode=disable down
 	@echo "...Migration down done."
 
+migrate-reset:
+	@echo "Migrating reset..."
+	@goose -dir backend/rss-aggregator/sql/schema postgres \
+	 postgres://$(DB_USERNAME):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_DATABASE)?sslmode=disable reset
+	@echo "...Migration reset done."
+
+
 sqlc-generate:
 	@echo "Generating SQLC..."
 	@cd backend/rss-aggregator && sqlc generate

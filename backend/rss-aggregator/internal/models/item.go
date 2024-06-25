@@ -26,7 +26,7 @@ type Item struct {
 	Description *string   `json:"description"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
-	ChannelID   int32     `json:"channel_id"`
+	ChannelID   uuid.UUID `json:"channel_id"`
 }
 
 func DatabaseItemToItem(dbItem database.Item) Item {

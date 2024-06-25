@@ -11,7 +11,6 @@ type Channel struct {
 	ID          uuid.UUID  `json:"id"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
-	ChannelID   int32      `json:"channel_id"`
 	Title       *string    `json:"title"`
 	Description *string    `json:"description"`
 	Link        *string    `json:"link"`
@@ -35,20 +34,15 @@ func DatabaseChannelToChannel(dbChannel database.Channel) Channel {
 		atomLink = &dbChannel.AtomLink.String
 	}
 
-	var feedID *uuid.UUID
-	if dbChannel.FeedID.Valid {
-		feedID = &dbChannel.FeedID.UUID
-	}
 	return Channel{
 		ID:          dbChannel.ID,
 		CreatedAt:   dbChannel.CreatedAt,
 		UpdatedAt:   dbChannel.UpdatedAt,
-		ChannelID:   dbChannel.ChannelID,
 		Title:       &dbChannel.Title,
 		Description: description,
 		Link:        link,
 		AtomLink:    atomLink,
-		FeedID:      feedID,
+		FeedID:      &dbChannel.FeedID,
 	}
 }
 

@@ -8,7 +8,7 @@ CREATE TABLE channels (
     description TEXT,
     link VARCHAR(255),
     atom_link VARCHAR(255),
-    feed_id UUID REFERENCES feeds(id)
+    feed_id UUID REFERENCES feeds(id) NOT NULL
 );
 
 -- +goose Down

@@ -15,12 +15,11 @@ type Channel struct {
 	ID          uuid.UUID
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
-	ChannelID   int32
 	Title       string
 	Description sql.NullString
 	Link        sql.NullString
 	AtomLink    sql.NullString
-	FeedID      uuid.NullUUID
+	FeedID      uuid.UUID
 }
 
 type Feed struct {
@@ -58,7 +57,7 @@ type Item struct {
 	Description sql.NullString
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
-	ChannelID   int32
+	ChannelID   uuid.UUID
 }
 
 type User struct {

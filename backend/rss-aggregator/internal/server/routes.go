@@ -49,5 +49,10 @@ func (apiCfg *ApiConfig) RegisterRoutes() http.Handler {
 	routerGroupFeedFollows.GET("/user/:user_id/feed/:feed_id", apiCfg.GetFeedFollowsByUserIdAndFeedIdHandler())
 	routerGroupFeedFollows.DELETE("/user/:user_id/feed/:feed_id", apiCfg.DeleteFeedFollowsByUserIdAndFeedIdHandler())
 
+	// nyaa
+
+	routerGroupNyaa := routerGroup.Group("/nyaa")
+	routerGroupNyaa.GET("/rss", apiCfg.HandlerNyaaRss())
+
 	return router
 }

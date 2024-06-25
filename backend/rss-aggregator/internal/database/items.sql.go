@@ -14,7 +14,8 @@ import (
 )
 
 const createItem = `-- name: CreateItem :one
-INSERT INTO items (id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id)
+INSERT INTO items (id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id,
+ category, size, comments, trusted, remake, description, created_at, updated_at, channel_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 RETURNING id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id
 `
@@ -38,7 +39,7 @@ type CreateItemParams struct {
 	Description sql.NullString
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
-	ChannelID   int32
+	ChannelID   uuid.UUID
 }
 
 func (q *Queries) CreateItem(ctx context.Context, arg CreateItemParams) (Item, error) {
@@ -92,7 +93,7 @@ const getItemByChannelId = `-- name: GetItemByChannelId :many
 SELECT id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id FROM items WHERE channel_id = $1
 `
 
-func (q *Queries) GetItemByChannelId(ctx context.Context, channelID int32) ([]Item, error) {
+func (q *Queries) GetItemByChannelId(ctx context.Context, channelID uuid.UUID) ([]Item, error) {
 	rows, err := q.db.QueryContext(ctx, getItemByChannelId, channelID)
 	if err != nil {
 		return nil, err
@@ -242,4 +243,79 @@ func (q *Queries) GetItems(ctx context.Context) ([]Item, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateItem = `-- name: UpdateItem :one
+UPDATE items SET title = $2, link = $3, guid = $4, pubdate = $5, seeders = $6, leechers = $7,
+ downloads = $8, infohash = $9, category_id = $10, category = $11, size = $12, comments = $13,
+ trusted = $14, remake = $15, description = $16, updated_at = $17, channel_id = $18
+WHERE id = $1
+RETURNING id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id
+`
+
+type UpdateItemParams struct {
+	ID          uuid.UUID
+	Title       sql.NullString
+	Link        sql.NullString
+	Guid        string
+	Pubdate     sql.NullString
+	Seeders     sql.NullInt32
+	Leechers    sql.NullInt32
+	Downloads   sql.NullInt32
+	Infohash    sql.NullString
+	CategoryID  sql.NullString
+	Category    sql.NullString
+	Size        sql.NullString
+	Comments    sql.NullInt32
+	Trusted     sql.NullString
+	Remake      sql.NullString
+	Description sql.NullString
+	UpdatedAt   time.Time
+	ChannelID   uuid.UUID
+}
+
+func (q *Queries) UpdateItem(ctx context.Context, arg UpdateItemParams) (Item, error) {
+	row := q.db.QueryRowContext(ctx, updateItem,
+		arg.ID,
+		arg.Title,
+		arg.Link,
+		arg.Guid,
+		arg.Pubdate,
+		arg.Seeders,
+		arg.Leechers,
+		arg.Downloads,
+		arg.Infohash,
+		arg.CategoryID,
+		arg.Category,
+		arg.Size,
+		arg.Comments,
+		arg.Trusted,
+		arg.Remake,
+		arg.Description,
+		arg.UpdatedAt,
+		arg.ChannelID,
+	)
+	var i Item
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Link,
+		&i.Guid,
+		&i.Pubdate,
+		&i.Seeders,
+		&i.Leechers,
+		&i.Downloads,
+		&i.Infohash,
+		&i.CategoryID,
+		&i.Category,
+		&i.Size,
+		&i.Comments,
+		&i.Trusted,
+		&i.Remake,
+		&i.Description,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ChannelID,
+	)
+	return i, err
 }

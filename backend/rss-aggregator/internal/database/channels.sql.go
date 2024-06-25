@@ -15,21 +15,20 @@ import (
 
 const createChannel = `-- name: CreateChannel :one
 
-INSERT INTO channels (id, created_at, updated_at, channel_id, title, description, link, atom_link, feed_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, created_at, updated_at, channel_id, title, description, link, atom_link, feed_id
+INSERT INTO channels (id, created_at, updated_at, title, description, link, atom_link, feed_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, created_at, updated_at, title, description, link, atom_link, feed_id
 `
 
 type CreateChannelParams struct {
 	ID          uuid.UUID
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
-	ChannelID   int32
 	Title       string
 	Description sql.NullString
 	Link        sql.NullString
 	AtomLink    sql.NullString
-	FeedID      uuid.NullUUID
+	FeedID      uuid.UUID
 }
 
 func (q *Queries) CreateChannel(ctx context.Context, arg CreateChannelParams) (Channel, error) {
@@ -37,7 +36,6 @@ func (q *Queries) CreateChannel(ctx context.Context, arg CreateChannelParams) (C
 		arg.ID,
 		arg.CreatedAt,
 		arg.UpdatedAt,
-		arg.ChannelID,
 		arg.Title,
 		arg.Description,
 		arg.Link,
@@ -49,29 +47,6 @@ func (q *Queries) CreateChannel(ctx context.Context, arg CreateChannelParams) (C
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.ChannelID,
-		&i.Title,
-		&i.Description,
-		&i.Link,
-		&i.AtomLink,
-		&i.FeedID,
-	)
-	return i, err
-}
-
-const getChannelByChannelId = `-- name: GetChannelByChannelId :one
-
-SELECT id, created_at, updated_at, channel_id, title, description, link, atom_link, feed_id FROM channels WHERE channel_id = $1
-`
-
-func (q *Queries) GetChannelByChannelId(ctx context.Context, channelID int32) (Channel, error) {
-	row := q.db.QueryRowContext(ctx, getChannelByChannelId, channelID)
-	var i Channel
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.ChannelID,
 		&i.Title,
 		&i.Description,
 		&i.Link,
@@ -83,10 +58,10 @@ func (q *Queries) GetChannelByChannelId(ctx context.Context, channelID int32) (C
 
 const getChannelByFeedId = `-- name: GetChannelByFeedId :many
 
-SELECT id, created_at, updated_at, channel_id, title, description, link, atom_link, feed_id FROM channels WHERE feed_id = $1
+SELECT id, created_at, updated_at, title, description, link, atom_link, feed_id FROM channels WHERE feed_id = $1
 `
 
-func (q *Queries) GetChannelByFeedId(ctx context.Context, feedID uuid.NullUUID) ([]Channel, error) {
+func (q *Queries) GetChannelByFeedId(ctx context.Context, feedID uuid.UUID) ([]Channel, error) {
 	rows, err := q.db.QueryContext(ctx, getChannelByFeedId, feedID)
 	if err != nil {
 		return nil, err
@@ -99,7 +74,6 @@ func (q *Queries) GetChannelByFeedId(ctx context.Context, feedID uuid.NullUUID) 
 			&i.ID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.ChannelID,
 			&i.Title,
 			&i.Description,
 			&i.Link,
@@ -121,7 +95,7 @@ func (q *Queries) GetChannelByFeedId(ctx context.Context, feedID uuid.NullUUID) 
 
 const getChannelById = `-- name: GetChannelById :one
 
-SELECT id, created_at, updated_at, channel_id, title, description, link, atom_link, feed_id FROM channels WHERE id = $1
+SELECT id, created_at, updated_at, title, description, link, atom_link, feed_id FROM channels WHERE id = $1
 `
 
 func (q *Queries) GetChannelById(ctx context.Context, id uuid.UUID) (Channel, error) {
@@ -131,7 +105,6 @@ func (q *Queries) GetChannelById(ctx context.Context, id uuid.UUID) (Channel, er
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.ChannelID,
 		&i.Title,
 		&i.Description,
 		&i.Link,
@@ -142,7 +115,7 @@ func (q *Queries) GetChannelById(ctx context.Context, id uuid.UUID) (Channel, er
 }
 
 const getChannelByTitle = `-- name: GetChannelByTitle :one
-SELECT id, created_at, updated_at, channel_id, title, description, link, atom_link, feed_id FROM channels WHERE title = $1
+SELECT id, created_at, updated_at, title, description, link, atom_link, feed_id FROM channels WHERE title = $1
 `
 
 func (q *Queries) GetChannelByTitle(ctx context.Context, title string) (Channel, error) {
@@ -152,7 +125,6 @@ func (q *Queries) GetChannelByTitle(ctx context.Context, title string) (Channel,
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.ChannelID,
 		&i.Title,
 		&i.Description,
 		&i.Link,
@@ -164,7 +136,7 @@ func (q *Queries) GetChannelByTitle(ctx context.Context, title string) (Channel,
 
 const getChannels = `-- name: GetChannels :many
 
-SELECT id, created_at, updated_at, channel_id, title, description, link, atom_link, feed_id FROM channels
+SELECT id, created_at, updated_at, title, description, link, atom_link, feed_id FROM channels
 `
 
 func (q *Queries) GetChannels(ctx context.Context) ([]Channel, error) {
@@ -180,7 +152,6 @@ func (q *Queries) GetChannels(ctx context.Context) ([]Channel, error) {
 			&i.ID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.ChannelID,
 			&i.Title,
 			&i.Description,
 			&i.Link,
