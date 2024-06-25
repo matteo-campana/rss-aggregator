@@ -4,6 +4,11 @@ export
 # Build the application
 all: build
 
+
+build:
+	@echo "Building..."
+	cd backend/rss-aggregator && go mod tidy && go build -o main cmd/api/main.go; \
+
 build-dev:
 	@echo "Set GIN_MODE=debug"
 	@export GIN_MODE=debug
@@ -25,6 +30,10 @@ build-prod:
 # Run the application
 run:
 	@cd backend/rss-aggregator && go run cmd/api/main.go
+
+start:
+	@make build
+	@make run
 
 # Create DB container
 docker-run:
@@ -57,6 +66,10 @@ migrate-down:
 	@goose -dir backend/rss-aggregator/sql/schema postgres \
 	 postgres://$(DB_USERNAME):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_DATABASE)?sslmode=disable down
 	@echo "...Migration down done."
+
+sqlc-generate:
+	@echo "Generating SQLC..."
+	@cd backend/rss-aggregator && sqlc generate
 
 # Test the application
 test:

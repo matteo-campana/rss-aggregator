@@ -11,6 +11,18 @@ import (
 	"github.com/google/uuid"
 )
 
+type Channel struct {
+	ID          uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	ChannelID   int32
+	Title       string
+	Description sql.NullString
+	Link        sql.NullString
+	AtomLink    sql.NullString
+	FeedID      uuid.NullUUID
+}
+
 type Feed struct {
 	ID        uuid.UUID
 	CreatedAt time.Time
@@ -25,6 +37,28 @@ type FeedFollow struct {
 	UpdatedAt time.Time
 	FeedID    uuid.UUID
 	UserID    uuid.UUID
+}
+
+type Item struct {
+	ID          uuid.UUID
+	Title       sql.NullString
+	Link        sql.NullString
+	Guid        string
+	Pubdate     sql.NullString
+	Seeders     sql.NullInt32
+	Leechers    sql.NullInt32
+	Downloads   sql.NullInt32
+	Infohash    sql.NullString
+	CategoryID  sql.NullString
+	Category    sql.NullString
+	Size        sql.NullString
+	Comments    sql.NullInt32
+	Trusted     sql.NullString
+	Remake      sql.NullString
+	Description sql.NullString
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	ChannelID   int32
 }
 
 type User struct {
