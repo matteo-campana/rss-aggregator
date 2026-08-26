@@ -196,3 +196,102 @@ func TestParseRSSItemDateIsParsable(t *testing.T) {
 		t.Errorf("the fixture pubDate %q was not parsed", rss.Channel.Items[0].PubDate)
 	}
 }
+
+func TestParseLanguage(t *testing.T) {
+	tests := []struct {
+		value string
+		want  Language
+		ok    bool
+	}{
+		{value: "", want: ENG, ok: true},
+		{value: "ENG", want: ENG, ok: true},
+		{value: "ita", want: ITA, ok: true},
+		{value: "POR-BR", want: PORBR, ok: true},
+		{value: "klingon"},
+		{value: "EN"},
+	}
+
+	for _, tt := range tests {
+		got, err := ParseLanguage(tt.value)
+
+		if tt.ok && err != nil {
+			t.Errorf("ParseLanguage(%q): %v", tt.value, err)
+			continue
+		}
+
+		if !tt.ok {
+			if err == nil {
+				t.Errorf("ParseLanguage(%q) = %q, want an error", tt.value, got)
+			}
+
+			continue
+		}
+
+		if got != tt.want {
+			t.Errorf("ParseLanguage(%q) = %q, want %q", tt.value, got, tt.want)
+		}
+	}
+}
+
+func TestParseResolution(t *testing.T) {
+	tests := []struct {
+		value string
+		want  Resolution
+		ok    bool
+	}{
+		{value: "", want: Resolution1080p, ok: true},
+		{value: "720p", want: Resolution720p, ok: true},
+		{value: "4k", want: Resolution4K, ok: true},
+		{value: "1440p"},
+	}
+
+	for _, tt := range tests {
+		got, err := ParseResolution(tt.value)
+
+		if tt.ok && err != nil {
+			t.Errorf("ParseResolution(%q): %v", tt.value, err)
+			continue
+		}
+
+		if !tt.ok {
+			if err == nil {
+				t.Errorf("ParseResolution(%q) = %q, want an error", tt.value, got)
+			}
+
+			continue
+		}
+
+		if got != tt.want {
+			t.Errorf("ParseResolution(%q) = %q, want %q", tt.value, got, tt.want)
+		}
+	}
+}
+
+// The error has to say what would have been accepted, otherwise the caller has
+// to read the source to find out.
+func TestParseLanguageErrorListsTheAcceptedValues(t *testing.T) {
+	_, err := ParseLanguage("klingon")
+
+	if err == nil {
+		t.Fatal("got nil error")
+	}
+
+	for _, expected := range []string{"ENG", "ITA", "POR-BR"} {
+		if !strings.Contains(err.Error(), expected) {
+			t.Errorf("error %q does not mention %q", err, expected)
+		}
+	}
+}
+
+func TestNyaaFeedURLUsesTheRequestedValues(t *testing.T) {
+	feedURL := NyaaFeedURL(&FetchAndParseRSSRequest{Language: ITA, Resolution: Resolution720p})
+
+	parsed, err := url.Parse(feedURL)
+	if err != nil {
+		t.Fatalf("parsing %q: %v", feedURL, err)
+	}
+
+	if got, want := parsed.Query().Get("q"), "ITA 720p"; got != want {
+		t.Errorf("q = %q, want %q", got, want)
+	}
+}

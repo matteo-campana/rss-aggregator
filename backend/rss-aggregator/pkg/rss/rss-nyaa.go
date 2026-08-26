@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	database "rss-aggregator/internal/database"
@@ -85,6 +86,54 @@ const (
 	ITA   Language = "ITA"
 	RUS   Language = "RUS"
 )
+
+// Languages and Resolutions list the accepted values, so the API can validate a
+// request and report what it would have accepted.
+var Languages = []Language{ENG, PORBR, SPALA, SPA, ARA, FRE, GER, ITA, RUS}
+
+var Resolutions = []Resolution{Resolution480p, Resolution720p, Resolution1080p, Resolution4K}
+
+// ParseLanguage matches a language, case-insensitively. An empty value yields
+// the default, ENG.
+func ParseLanguage(value string) (Language, error) {
+	if value == "" {
+		return ENG, nil
+	}
+
+	for _, language := range Languages {
+		if strings.EqualFold(value, string(language)) {
+			return language, nil
+		}
+	}
+
+	return "", fmt.Errorf("unknown language %q, expected one of: %s", value, join(Languages))
+}
+
+// ParseResolution matches a resolution, case-insensitively. An empty value
+// yields the default, 1080p.
+func ParseResolution(value string) (Resolution, error) {
+	if value == "" {
+		return Resolution1080p, nil
+	}
+
+	for _, resolution := range Resolutions {
+		if strings.EqualFold(value, string(resolution)) {
+			return resolution, nil
+		}
+	}
+
+	return "", fmt.Errorf("unknown resolution %q, expected one of: %s", value, join(Resolutions))
+}
+
+func join[T ~string](values []T) string {
+	parts := make([]string, 0, len(values))
+
+	for _, value := range values {
+		parts = append(parts, string(value))
+	}
+
+	return strings.Join(parts, ", ")
+}
 
 type FetchAndParseRSSRequest struct {
 	Language   Language

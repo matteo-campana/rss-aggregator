@@ -128,3 +128,19 @@ func TestListItemsHandlerRejectsInvalidQuery(t *testing.T) {
 		t.Errorf("status = %d, want %d (body: %s)", got, want, recorder.Body.String())
 	}
 }
+
+func TestHandlerNyaaRssRejectsUnknownLanguageOrResolution(t *testing.T) {
+	apiCfg := &ApiConfig{}
+
+	router := gin.New()
+	router.GET("/nyaa/rss", apiCfg.HandlerNyaaRss())
+
+	for _, query := range []string{"?language=klingon", "?resolution=1440p"} {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/nyaa/rss"+query, nil))
+
+		if got, want := recorder.Code, http.StatusBadRequest; got != want {
+			t.Errorf("%s: status = %d, want %d (body: %s)", query, got, want, recorder.Body.String())
+		}
+	}
+}
