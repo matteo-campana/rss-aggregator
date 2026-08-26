@@ -35,10 +35,17 @@ export function FiltersBar({ filters, categories, channels }: Props) {
     router.push(query.toString() ? `/?${query.toString()}` : "/");
   }
 
-  const hasFilters = searchParams.toString() !== "";
+  const currentQuery = searchParams.toString();
+  const hasFilters = currentQuery !== "";
 
   return (
+    // The inputs are uncontrolled, so their defaultValue only applies when they
+    // mount. Keying the form on the query string remounts them whenever the URL
+    // changes — after Reset, or the browser back button — which otherwise left
+    // stale values in the fields and re-submitted a filter that had just been
+    // cleared.
     <form
+      key={currentQuery}
       onSubmit={onSubmit}
       className="flex flex-wrap items-end gap-3 rounded border border-neutral-200 p-4 dark:border-neutral-800"
     >
