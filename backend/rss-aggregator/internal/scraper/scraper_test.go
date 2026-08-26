@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"rss-aggregator/internal/cache"
 	"rss-aggregator/internal/database"
 
 	"github.com/google/uuid"
@@ -43,6 +44,7 @@ func (f *fakeStore) MarkFeedAsFetched(ctx context.Context, id uuid.UUID) (databa
 func newTestScraper(store FeedStore, sync func(ctx context.Context, feed database.Feed) error) *Scraper {
 	return &Scraper{
 		store:       store,
+		cache:       cache.Disabled(),
 		syncFeed:    sync,
 		concurrency: 2,
 		interval:    time.Hour,

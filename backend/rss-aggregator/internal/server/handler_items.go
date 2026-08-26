@@ -104,39 +104,39 @@ func (apiCfg *ApiConfig) ListItemsHandler() gin.HandlerFunc {
 			return
 		}
 
-		rows, err := apiCfg.queries.ListItems(c, query.params)
+		apiCfg.serveCached(c, "items", func() (any, error) {
+			rows, err := apiCfg.queries.ListItems(c, query.params)
 
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+			if err != nil {
+				return nil, err
+			}
 
-		// The channels are few, so one lookup is cheaper than joining on every
-		// row and mapping a wider generated type.
-		channelTitles, err := apiCfg.channelTitles(c)
+			// The channels are few, so one lookup is cheaper than joining on
+			// every row and mapping a wider generated type.
+			channelTitles, err := apiCfg.channelTitles(c)
 
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+			if err != nil {
+				return nil, err
+			}
 
-		total := int64(0)
-		items := make([]itemResponse, 0, len(rows))
+			total := int64(0)
+			items := make([]itemResponse, 0, len(rows))
 
-		for _, row := range rows {
-			total = row.TotalCount
+			for _, row := range rows {
+				total = row.TotalCount
 
-			items = append(items, itemResponse{
-				Item:         models.DatabaseListItemsRowToItem(row),
-				ChannelTitle: channelTitles[row.ChannelID],
-			})
-		}
+				items = append(items, itemResponse{
+					Item:         models.DatabaseListItemsRowToItem(row),
+					ChannelTitle: channelTitles[row.ChannelID],
+				})
+			}
 
-		c.JSON(http.StatusOK, gin.H{
-			"items":    items,
-			"page":     query.page,
-			"per_page": query.perPage,
-			"total":    total,
+			return gin.H{
+				"items":    items,
+				"page":     query.page,
+				"per_page": query.perPage,
+				"total":    total,
+			}, nil
 		})
 	}
 }
@@ -145,22 +145,23 @@ func (apiCfg *ApiConfig) ListItemsHandler() gin.HandlerFunc {
 func (apiCfg *ApiConfig) ListItemCategoriesHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		rows, err := apiCfg.queries.ListItemCategories(c)
+		apiCfg.serveCached(c, "categories", func() (any, error) {
+			rows, err := apiCfg.queries.ListItemCategories(c)
 
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		categories := make([]string, 0, len(rows))
-
-		for _, row := range rows {
-			if row.Valid {
-				categories = append(categories, row.String)
+			if err != nil {
+				return nil, err
 			}
-		}
 
-		c.JSON(http.StatusOK, gin.H{"categories": categories})
+			categories := make([]string, 0, len(rows))
+
+			for _, row := range rows {
+				if row.Valid {
+					categories = append(categories, row.String)
+				}
+			}
+
+			return gin.H{"categories": categories}, nil
+		})
 	}
 }
 
@@ -168,14 +169,15 @@ func (apiCfg *ApiConfig) ListItemCategoriesHandler() gin.HandlerFunc {
 func (apiCfg *ApiConfig) GetChannelsHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		channels, err := apiCfg.queries.GetChannels(c)
+		apiCfg.serveCached(c, "channels", func() (any, error) {
+			channels, err := apiCfg.queries.GetChannels(c)
 
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+			if err != nil {
+				return nil, err
+			}
 
-		c.JSON(http.StatusOK, models.DatabaseChannelsToChannels(channels))
+			return models.DatabaseChannelsToChannels(channels), nil
+		})
 	}
 }
 

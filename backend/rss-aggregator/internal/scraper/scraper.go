@@ -10,8 +10,10 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"rss-aggregator/internal/cache"
 	"rss-aggregator/internal/database"
 	"rss-aggregator/pkg/rss"
 
@@ -22,6 +24,10 @@ const (
 	defaultConcurrency = 3
 	defaultInterval    = 10 * time.Minute
 	fetchTimeout       = 30 * time.Second
+
+	// lockTTL outlives a fetch, so a worker that dies mid-run does not hold a
+	// feed hostage, and a healthy one is never cut off half way.
+	lockTTL = 2 * fetchTimeout
 )
 
 // Config holds the scraper settings, read from the environment.
@@ -70,17 +76,24 @@ type FeedStore interface {
 // Scraper periodically refreshes the feeds that were fetched least recently.
 type Scraper struct {
 	store       FeedStore
+	cache       *cache.Client
 	syncFeed    func(ctx context.Context, feed database.Feed) error
 	concurrency int
 	interval    time.Duration
 }
 
-// New builds a scraper backed by the generated queries.
-func New(db *database.Queries, config Config) *Scraper {
+// New builds a scraper backed by the generated queries. The cache client may be
+// a disabled one: locking and invalidation then simply do nothing.
+func New(db *database.Queries, config Config, cacheClient *cache.Client) *Scraper {
 	client := &http.Client{Timeout: fetchTimeout}
+
+	if cacheClient == nil {
+		cacheClient = cache.Disabled()
+	}
 
 	return &Scraper{
 		store:       db,
+		cache:       cacheClient,
 		concurrency: config.Concurrency,
 		interval:    config.Interval,
 		syncFeed: func(ctx context.Context, feed database.Feed) error {
@@ -133,28 +146,52 @@ func (s *Scraper) ScrapeOnce(ctx context.Context) {
 	}
 
 	waitGroup := &sync.WaitGroup{}
+	refreshed := &atomic.Bool{}
 
 	for _, feed := range feeds {
 		waitGroup.Add(1)
 
 		go func(feed database.Feed) {
 			defer waitGroup.Done()
-			s.scrape(ctx, feed)
+
+			if s.scrape(ctx, feed) {
+				refreshed.Store(true)
+			}
 		}(feed)
 	}
 
 	waitGroup.Wait()
+
+	// The stored items changed, so anything cached from them is stale.
+	if refreshed.Load() {
+		s.cache.BumpVersion(ctx, "items")
+	}
 }
 
 // scrape refreshes a single feed. A failure is logged and skipped: one broken
 // feed must not stop the others or the loop.
-func (s *Scraper) scrape(ctx context.Context, feed database.Feed) {
+func (s *Scraper) scrape(ctx context.Context, feed database.Feed) bool {
+	// With several instances running, only one of them should work a given
+	// feed. Without Redis the lock is always granted, which is the behaviour a
+	// single instance had all along.
+	release, acquired := s.cache.AcquireLock(ctx, "lock:feed:"+feed.ID.String(), lockTTL)
+
+	if !acquired {
+		log.Printf("scraper: feed %s is being refreshed elsewhere, skipping", feed.Name)
+		return false
+	}
+
+	defer release()
+
 	if _, err := s.store.MarkFeedAsFetched(ctx, feed.ID); err != nil {
 		log.Printf("scraper: marking feed %s as fetched: %v", feed.Name, err)
-		return
+		return false
 	}
 
 	if err := s.syncFeed(ctx, feed); err != nil {
 		log.Printf("scraper: syncing feed %s: %v", feed.Name, err)
+		return false
 	}
+
+	return true
 }

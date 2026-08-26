@@ -25,7 +25,7 @@ func (apiCfg *ApiConfig) RegisterRoutes() http.Handler {
 	// everything below requires `Authorization: ApiKey <key>`
 
 	authenticated := routerGroup.Group("")
-	authenticated.Use(MiddlewareAuth(apiCfg.queries))
+	authenticated.Use(MiddlewareAuth(apiCfg.queries), apiCfg.MiddlewareRateLimit())
 
 	// users
 	routerGroupUsers := authenticated.Group("/users")

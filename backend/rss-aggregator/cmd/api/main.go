@@ -27,7 +27,7 @@ func main() {
 	defer stop()
 
 	if config := scraper.ConfigFromEnv(); config.Enabled {
-		go scraper.New(apiCfg.Queries(), config).Run(ctx)
+		go scraper.New(apiCfg.Queries(), config, apiCfg.Cache()).Run(ctx)
 	} else {
 		log.Print("scraper: disabled, set SCRAPER_ENABLED=true to enable it")
 	}

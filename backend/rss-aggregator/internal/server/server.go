@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"rss-aggregator/internal/cache"
 	"rss-aggregator/internal/database"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -20,6 +21,7 @@ const defaultPort = 8080
 type ApiConfig struct {
 	queries *database.Queries
 	conn    *sql.DB
+	cache   *cache.Client
 	port    int
 }
 
@@ -51,6 +53,7 @@ func NewApiConfig() *ApiConfig {
 	return &ApiConfig{
 		queries: database.New(conn),
 		conn:    conn,
+		cache:   cache.New(cache.ConfigFromEnv()),
 		port:    port,
 	}
 }
@@ -61,8 +64,22 @@ func (apiCfg *ApiConfig) Queries() *database.Queries {
 	return apiCfg.queries
 }
 
-// Close releases the database connection.
+// Cache exposes the Redis client to the other components, the scraper in
+// particular. It is never nil: a disabled client is still usable.
+func (apiCfg *ApiConfig) Cache() *cache.Client {
+	if apiCfg.cache == nil {
+		apiCfg.cache = cache.Disabled()
+	}
+
+	return apiCfg.cache
+}
+
+// Close releases the database and Redis connections.
 func (apiCfg *ApiConfig) Close() error {
+	if apiCfg.cache != nil {
+		apiCfg.cache.Close()
+	}
+
 	if apiCfg.conn == nil {
 		return nil
 	}
