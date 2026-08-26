@@ -37,6 +37,17 @@ start:
 	@make build
 	@make run
 
+# Full stack: Postgres, Redis, migrations, API and frontend
+docker-build:
+	@docker compose build
+
+docker-up:
+	@docker compose up -d
+	@echo "API on http://localhost:$${PORT:-8080}, frontend on http://localhost:3000"
+
+docker-logs:
+	@docker compose logs -f api frontend
+
 # Create DB container
 docker-run:
 	@if docker compose up 2>/dev/null; then \
@@ -133,4 +144,4 @@ watch:
 	    fi; \
 	fi
 
-.PHONY: all build build-dev build-prod run start docker-run docker-down migrate-up migrate-down migrate-reset sqlc-generate test test-cover vet fmt check frontend-install frontend-dev frontend-build frontend-check clean watch
+.PHONY: all build build-dev build-prod run start docker-build docker-up docker-logs docker-run docker-down migrate-up migrate-down migrate-reset sqlc-generate test test-cover vet fmt check frontend-install frontend-dev frontend-build frontend-check clean watch

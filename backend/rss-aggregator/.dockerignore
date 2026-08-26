@@ -1,0 +1,9 @@
+# The build only needs the sources: keep the local binary, the editor bits and
+# anything secret out of the build context.
+main
+tmp/
+*.backup
+.env
+.env.*
+.air.toml
+README.md

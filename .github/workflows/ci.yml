@@ -160,3 +160,67 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  images:
+    name: Docker images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # There is no Docker daemon in the development sandbox, so this job is
+      # what actually proves the Dockerfiles build.
+      - name: Build the API image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend/rss-aggregator
+          target: api
+          push: false
+          load: true
+          tags: rss-aggregator-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build the migration image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend/rss-aggregator
+          target: migrate
+          push: false
+          load: true
+          tags: rss-aggregator-migrate:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build the frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: false
+          load: true
+          tags: rss-aggregator-frontend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # A built image is not the same as a working one: check the binaries are
+      # there and that nothing runs as root.
+      - name: Inspect the images
+        run: |
+          set -eux
+          docker run --rm --entrypoint goose rss-aggregator-migrate:ci --version
+          docker run --rm --entrypoint sh rss-aggregator-api:ci -c 'test -x /usr/local/bin/api'
+          docker run --rm --entrypoint sh rss-aggregator-frontend:ci -c 'test -f /app/server.js'
+          for image in rss-aggregator-api rss-aggregator-migrate rss-aggregator-frontend; do
+            user=$(docker image inspect "$image:ci" --format '{{.Config.User}}')
+            echo "$image runs as '${user}'"
+            if [ -z "$user" ] || [ "$user" = "root" ] || [ "$user" = "0" ]; then
+              echo "$image would run as root" >&2
+              exit 1
+            fi
+          done
+
+      - name: Validate the compose stack
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
