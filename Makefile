@@ -98,6 +98,19 @@ fmt:
 
 check: fmt vet test
 
+# Frontend (Next.js)
+frontend-install:
+	@cd frontend && npm ci
+
+frontend-dev:
+	@cd frontend && npm run dev
+
+frontend-build:
+	@cd frontend && npm run build
+
+frontend-check:
+	@cd frontend && npm run lint && npm run typecheck && npm test
+
 # Clean the binary
 clean:
 	@echo "Cleaning..."
@@ -120,4 +133,4 @@ watch:
 	    fi; \
 	fi
 
-.PHONY: all build build-dev build-prod run start docker-run docker-down migrate-up migrate-down migrate-reset sqlc-generate test test-cover vet fmt check clean watch
+.PHONY: all build build-dev build-prod run start docker-run docker-down migrate-up migrate-down migrate-reset sqlc-generate test test-cover vet fmt check frontend-install frontend-dev frontend-build frontend-check clean watch
