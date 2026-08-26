@@ -30,7 +30,9 @@ func TestRegisterRoutes(t *testing.T) {
 		http.MethodGet + " /api/v1/feeds/",
 		http.MethodPost + " /api/v1/feeds/",
 		http.MethodGet + " /api/v1/feed-follows/",
-		http.MethodGet + " /api/v1/feed-follows/user/:user_id",
+		http.MethodGet + " /api/v1/feed-follows/:id",
+		http.MethodGet + " /api/v1/feed-follows/feed/:feed_id",
+		http.MethodDelete + " /api/v1/feed-follows/feed/:feed_id",
 		http.MethodGet + " /api/v1/nyaa/rss",
 		http.MethodGet + " /api/v1/items/",
 		http.MethodGet + " /api/v1/items/categories",
@@ -40,6 +42,18 @@ func TestRegisterRoutes(t *testing.T) {
 	for _, route := range want {
 		if !registered[route] {
 			t.Errorf("route %q is not registered", route)
+		}
+	}
+
+	// The user-in-the-path routes let any valid API key read and delete another
+	// user's follows. They must stay gone.
+	for _, route := range []string{
+		http.MethodGet + " /api/v1/feed-follows/user/:user_id",
+		http.MethodGet + " /api/v1/feed-follows/user/:user_id/feed/:feed_id",
+		http.MethodDelete + " /api/v1/feed-follows/user/:user_id/feed/:feed_id",
+	} {
+		if registered[route] {
+			t.Errorf("route %q is registered again: a follow must never be addressed by another user's id", route)
 		}
 	}
 }

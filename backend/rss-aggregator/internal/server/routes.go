@@ -47,17 +47,17 @@ func (apiCfg *ApiConfig) RegisterRoutes() http.Handler {
 
 	// feed follows
 
+	// Always the authenticated user's own follows: there is no /user/:user_id
+	// any more, which is what let one API key read and delete another user's rows.
 	routerGroupFeedFollows := authenticated.Group("/feed-follows")
 
 	routerGroupFeedFollows.POST("/", apiCfg.CreateFeedFollowsHandler())
 	routerGroupFeedFollows.GET("/", apiCfg.GetFeedsFollowsHandler())
+	routerGroupFeedFollows.GET("/:id", apiCfg.GetFeedFollowsByIdHandler())
 	routerGroupFeedFollows.DELETE("/:id", apiCfg.DeleteFeedFollowsHandler())
 
-	routerGroupFeedFollows.GET("/user/:user_id", apiCfg.GetFeedsFollowsByUserIdHandler())
-	routerGroupFeedFollows.GET("/feed/:feed_id", apiCfg.GetFeedsFollowsByFeedIdHandler())
-
-	routerGroupFeedFollows.GET("/user/:user_id/feed/:feed_id", apiCfg.GetFeedFollowsByUserIdAndFeedIdHandler())
-	routerGroupFeedFollows.DELETE("/user/:user_id/feed/:feed_id", apiCfg.DeleteFeedFollowsByUserIdAndFeedIdHandler())
+	routerGroupFeedFollows.GET("/feed/:feed_id", apiCfg.GetFeedFollowsByFeedIdHandler())
+	routerGroupFeedFollows.DELETE("/feed/:feed_id", apiCfg.DeleteFeedFollowsByFeedIdHandler())
 
 	// items and channels: what the scraper has already stored
 
