@@ -32,6 +32,7 @@ type Item struct {
 func DatabaseItemToItem(dbItem database.Item) Item {
 
 	var title, link, pubdate, infohash, category_id, category, size, trusted, remake, description *string
+	var seeders, leechers, downloads, comments *int32
 
 	if dbItem.Title.Valid {
 		title = &dbItem.Title.String
@@ -73,20 +74,36 @@ func DatabaseItemToItem(dbItem database.Item) Item {
 		description = &dbItem.Description.String
 	}
 
+	if dbItem.Seeders.Valid {
+		seeders = &dbItem.Seeders.Int32
+	}
+
+	if dbItem.Leechers.Valid {
+		leechers = &dbItem.Leechers.Int32
+	}
+
+	if dbItem.Downloads.Valid {
+		downloads = &dbItem.Downloads.Int32
+	}
+
+	if dbItem.Comments.Valid {
+		comments = &dbItem.Comments.Int32
+	}
+
 	return Item{
 		ID:          dbItem.ID,
 		Title:       title,
 		Link:        link,
 		Guid:        dbItem.Guid,
 		Pubdate:     pubdate,
-		Seeders:     &dbItem.Seeders.Int32,
-		Leechers:    &dbItem.Leechers.Int32,
-		Downloads:   &dbItem.Downloads.Int32,
+		Seeders:     seeders,
+		Leechers:    leechers,
+		Downloads:   downloads,
 		Infohash:    infohash,
 		CategoryID:  category_id,
 		Category:    category,
 		Size:        size,
-		Comments:    &dbItem.Comments.Int32,
+		Comments:    comments,
 		Trusted:     trusted,
 		Remake:      remake,
 		Description: description,
@@ -97,7 +114,7 @@ func DatabaseItemToItem(dbItem database.Item) Item {
 }
 
 func DatabaseItemsToItems(dbItem []database.Item) []Item {
-	var items []Item
+	items := []Item{}
 	for _, i := range dbItem {
 		items = append(items, DatabaseItemToItem(i))
 	}

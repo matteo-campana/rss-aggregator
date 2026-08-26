@@ -1,15 +1,26 @@
 package rss
 
 import (
+	"context"
 	"database/sql"
 	"encoding/xml"
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
-	database "rss-aggregator/internal/database"
+	"net/url"
 	"time"
 
-	"github.com/gin-gonic/gin"
+	database "rss-aggregator/internal/database"
+
 	"github.com/google/uuid"
 )
+
+// nyaaBaseURL is the RSS entry point of nyaa.si.
+const nyaaBaseURL = "https://nyaa.si/"
+
+// defaultTimeout bounds a single feed fetch.
+const defaultTimeout = 30 * time.Second
 
 type RSS struct {
 	XMLName xml.Name `xml:"rss"`
@@ -17,31 +28,37 @@ type RSS struct {
 	Channel Channel  `xml:"channel"`
 }
 
+// Channel mirrors the <channel> element. AtomLink is declared before Link so
+// that <atom:link> is matched by the namespaced field first: a field without a
+// namespace matches any local name, Link included.
 type Channel struct {
 	Title       string `xml:"title"`
 	Description string `xml:"description"`
-	Link        string `xml:"link"`
 	AtomLink    struct {
 		Href string `xml:"href,attr"`
-	} `xml:"atom\\:link"`
+	} `xml:"http://www.w3.org/2005/Atom link"`
+	Link  string `xml:"link"`
 	Items []Item `xml:"item"`
 }
 
+// Item mirrors an <item> element. The nyaa:* fields are matched on their local
+// name only, which keeps the mapping working whatever prefix or namespace URI
+// nyaa.si serves them under.
 type Item struct {
 	Title       string `xml:"title"`
 	Link        string `xml:"link"`
 	GUID        string `xml:"guid"`
 	PubDate     string `xml:"pubDate"`
-	Seeders     int    `xml:"nyaa\\:seeders"`
-	Leechers    int    `xml:"nyaa\\:leechers"`
-	Downloads   int    `xml:"nyaa\\:downloads"`
-	InfoHash    string `xml:"nyaa\\:infoHash"`
-	CategoryID  string `xml:"nyaa\\:categoryId"`
-	Category    string `xml:"nyaa\\:category"`
-	Size        string `xml:"nyaa\\:size"`
-	Comments    int    `xml:"nyaa\\:comments"`
-	Trusted     string `xml:"nyaa\\:trusted"`
-	Remake      string `xml:"nyaa\\:remake"`
+	Seeders     int    `xml:"seeders"`
+	Leechers    int    `xml:"leechers"`
+	Downloads   int    `xml:"downloads"`
+	InfoHash    string `xml:"infoHash"`
+	CategoryID  string `xml:"categoryId"`
+	Category    string `xml:"category"`
+	Size        string `xml:"size"`
+	Comments    int    `xml:"comments"`
+	Trusted     string `xml:"trusted"`
+	Remake      string `xml:"remake"`
 	Description string `xml:"description"`
 }
 
@@ -73,144 +90,233 @@ type FetchAndParseRSSRequest struct {
 	Resolution Resolution
 }
 
-// ParseRSS parses the RSS feed from the given byte slice.
-func FetchAndParseRSS(c *gin.Context,
-	fetchAndParseRSSRequest *FetchAndParseRSSRequest,
-	db *database.Queries) (*database.Channel, *[]database.Item, error) {
-
-	// language Language, resolution Resolution
-
-	url := "https://nyaa.si/?page=rss&c=1_0&f=0&q=" + string(fetchAndParseRSSRequest.Language) +
-		"+" + string(fetchAndParseRSSRequest.Resolution)
-
-	rss := &RSS{}
-	httpClient := &http.Client{
-		Timeout: time.Second * 30,
+// NyaaFeedURL builds the nyaa.si RSS URL for the requested language and resolution.
+func NyaaFeedURL(req *FetchAndParseRSSRequest) string {
+	query := url.Values{
+		"page": {"rss"},
+		"c":    {"1_0"},
+		"f":    {"0"},
+		"q":    {string(req.Language) + " " + string(req.Resolution)},
 	}
 
-	resp, err := httpClient.Get(url)
+	return nyaaBaseURL + "?" + query.Encode()
+}
 
+// ParseRSS decodes an RSS document.
+func ParseRSS(r io.Reader) (*RSS, error) {
+	rss := &RSS{}
+
+	if err := xml.NewDecoder(r).Decode(rss); err != nil {
+		return nil, fmt.Errorf("decoding rss feed: %w", err)
+	}
+
+	return rss, nil
+}
+
+// FetchRSS downloads and decodes the RSS document served at feedURL.
+func FetchRSS(ctx context.Context, client *http.Client, feedURL string) (*RSS, error) {
+	if client == nil {
+		client = &http.Client{Timeout: defaultTimeout}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedURL, nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, fmt.Errorf("building request for %s: %w", feedURL, err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetching %s: %w", feedURL, err)
 	}
 
 	defer resp.Body.Close()
 
-	err = xml.NewDecoder(resp.Body).Decode(rss)
-
-	if err != nil {
-		return nil, nil, err
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fetching %s: unexpected status %s", feedURL, resp.Status)
 	}
 
-	// check if the feed already exists
+	return ParseRSS(resp.Body)
+}
 
-	nyaa_feed, err := db.GetFeedByUrl(c, url)
+// SyncFeed stores the parsed feed: it upserts the feed, its channel and every
+// item, keyed on the feed URL, the channel title and the item GUID.
+func SyncFeed(ctx context.Context, db *database.Queries, feedName string, feedURL string, rss *RSS) (database.Channel, []database.Item, error) {
 
+	feed, err := getOrCreateFeed(ctx, db, feedName, feedURL)
 	if err != nil {
-		// create the feed
-
-		nyaa_feed, err = db.CreateFeed(c, database.CreateFeedParams{
-			Url:  url,
-			Name: "Nyaa",
-		})
-
-		if err != nil {
-			return nil, nil, err
-		}
+		return database.Channel{}, nil, err
 	}
 
-	// check if the channel already exists
-
-	channel, err := db.GetChannelByTitle(c, rss.Channel.Title)
-
+	channel, err := getOrCreateChannel(ctx, db, feed, rss.Channel)
 	if err != nil {
-		// create the channel
-
-		channel, err = db.CreateChannel(c, database.CreateChannelParams{
-			ID:          uuid.New(),
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-			Title:       rss.Channel.Title,
-			Description: sql.NullString{String: rss.Channel.Description, Valid: true},
-			Link:        sql.NullString{String: rss.Channel.Link, Valid: true},
-			AtomLink:    sql.NullString{String: rss.Channel.AtomLink.Href, Valid: true},
-			FeedID:      nyaa_feed.ID,
-		})
-
-		if err != nil {
-			return nil, nil, err
-		}
-
+		return database.Channel{}, nil, err
 	}
 
-	// check if the items already exist
-
-	databaseItems := []database.Item{}
+	items := make([]database.Item, 0, len(rss.Channel.Items))
 
 	for _, item := range rss.Channel.Items {
-
-		current_item, err := db.GetItemByGuid(c, item.GUID)
-
+		stored, err := upsertItem(ctx, db, channel.ID, item)
 		if err != nil {
-			created_item, err := db.CreateItem(c, database.CreateItemParams{
-				ID:          uuid.New(),
-				Title:       sql.NullString{String: item.Title, Valid: true},
-				Link:        sql.NullString{String: item.Link, Valid: true},
-				Guid:        item.GUID,
-				Pubdate:     sql.NullString{String: item.PubDate, Valid: true},
-				Seeders:     sql.NullInt32{Int32: int32(item.Seeders), Valid: true},
-				Leechers:    sql.NullInt32{Int32: int32(item.Leechers), Valid: true},
-				Downloads:   sql.NullInt32{Int32: int32(item.Downloads), Valid: true},
-				Infohash:    sql.NullString{String: item.InfoHash, Valid: true},
-				CategoryID:  sql.NullString{String: item.CategoryID, Valid: true},
-				Category:    sql.NullString{String: item.Category, Valid: true},
-				Size:        sql.NullString{String: item.Size, Valid: true},
-				Comments:    sql.NullInt32{Int32: int32(item.Comments), Valid: true},
-				Trusted:     sql.NullString{String: item.Trusted, Valid: true},
-				Remake:      sql.NullString{String: item.Remake, Valid: true},
-				Description: sql.NullString{String: item.Description, Valid: true},
-				CreatedAt:   time.Now(),
-				UpdatedAt:   time.Now(),
-				ChannelID:   channel.ID,
-			})
-
-			if err != nil {
-				return nil, nil, err
-			}
-
-			databaseItems = append(databaseItems, created_item)
-
-		} else {
-
-			updated_item, err := db.UpdateItem(c, database.UpdateItemParams{
-				ID:          current_item.ID,
-				Title:       sql.NullString{String: item.Title, Valid: true},
-				Link:        sql.NullString{String: item.Link, Valid: true},
-				Guid:        item.GUID,
-				Pubdate:     sql.NullString{String: item.PubDate, Valid: true},
-				Seeders:     sql.NullInt32{Int32: int32(item.Seeders), Valid: true},
-				Leechers:    sql.NullInt32{Int32: int32(item.Leechers), Valid: true},
-				Downloads:   sql.NullInt32{Int32: int32(item.Downloads), Valid: true},
-				Infohash:    sql.NullString{String: item.InfoHash, Valid: true},
-				CategoryID:  sql.NullString{String: item.CategoryID, Valid: true},
-				Category:    sql.NullString{String: item.Category, Valid: true},
-				Size:        sql.NullString{String: item.Size, Valid: true},
-				Comments:    sql.NullInt32{Int32: int32(item.Comments), Valid: true},
-				Trusted:     sql.NullString{String: item.Trusted, Valid: true},
-				Remake:      sql.NullString{String: item.Remake, Valid: true},
-				Description: sql.NullString{String: item.Description, Valid: true},
-				UpdatedAt:   time.Now(),
-				ChannelID:   channel.ID,
-			})
-
-			if err != nil {
-				return nil, nil, err
-			}
-
-			databaseItems = append(databaseItems, updated_item)
+			return database.Channel{}, nil, err
 		}
 
+		items = append(items, stored)
 	}
 
-	return &channel, &databaseItems, nil
+	return channel, items, nil
+}
+
+func getOrCreateFeed(ctx context.Context, db *database.Queries, feedName string, feedURL string) (database.Feed, error) {
+	feed, err := db.GetFeedByUrl(ctx, feedURL)
+
+	if err == nil {
+		return feed, nil
+	}
+
+	if !errors.Is(err, sql.ErrNoRows) {
+		return database.Feed{}, fmt.Errorf("looking up feed %s: %w", feedURL, err)
+	}
+
+	now := time.Now().UTC()
+
+	feed, err = db.CreateFeed(ctx, database.CreateFeedParams{
+		ID:        uuid.New(),
+		CreatedAt: now,
+		UpdatedAt: now,
+		Url:       feedURL,
+		Name:      feedName,
+	})
+
+	if err != nil {
+		return database.Feed{}, fmt.Errorf("creating feed %s: %w", feedURL, err)
+	}
+
+	return feed, nil
+}
+
+func getOrCreateChannel(ctx context.Context, db *database.Queries, feed database.Feed, parsed Channel) (database.Channel, error) {
+	channel, err := db.GetChannelByTitle(ctx, parsed.Title)
+
+	if err == nil {
+		return channel, nil
+	}
+
+	if !errors.Is(err, sql.ErrNoRows) {
+		return database.Channel{}, fmt.Errorf("looking up channel %q: %w", parsed.Title, err)
+	}
+
+	now := time.Now().UTC()
+
+	channel, err = db.CreateChannel(ctx, database.CreateChannelParams{
+		ID:          uuid.New(),
+		CreatedAt:   now,
+		UpdatedAt:   now,
+		Title:       parsed.Title,
+		Description: nullString(parsed.Description),
+		Link:        nullString(parsed.Link),
+		AtomLink:    nullString(parsed.AtomLink.Href),
+		FeedID:      feed.ID,
+	})
+
+	if err != nil {
+		return database.Channel{}, fmt.Errorf("creating channel %q: %w", parsed.Title, err)
+	}
+
+	return channel, nil
+}
+
+func upsertItem(ctx context.Context, db *database.Queries, channelID uuid.UUID, item Item) (database.Item, error) {
+	current, err := db.GetItemByGuid(ctx, item.GUID)
+
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return database.Item{}, fmt.Errorf("looking up item %s: %w", item.GUID, err)
+	}
+
+	now := time.Now().UTC()
+
+	if errors.Is(err, sql.ErrNoRows) {
+		created, err := db.CreateItem(ctx, database.CreateItemParams{
+			ID:          uuid.New(),
+			Title:       nullString(item.Title),
+			Link:        nullString(item.Link),
+			Guid:        item.GUID,
+			Pubdate:     nullString(item.PubDate),
+			Seeders:     nullInt32(item.Seeders),
+			Leechers:    nullInt32(item.Leechers),
+			Downloads:   nullInt32(item.Downloads),
+			Infohash:    nullString(item.InfoHash),
+			CategoryID:  nullString(item.CategoryID),
+			Category:    nullString(item.Category),
+			Size:        nullString(item.Size),
+			Comments:    nullInt32(item.Comments),
+			Trusted:     nullString(item.Trusted),
+			Remake:      nullString(item.Remake),
+			Description: nullString(item.Description),
+			CreatedAt:   now,
+			UpdatedAt:   now,
+			ChannelID:   channelID,
+		})
+
+		if err != nil {
+			return database.Item{}, fmt.Errorf("creating item %s: %w", item.GUID, err)
+		}
+
+		return created, nil
+	}
+
+	updated, err := db.UpdateItem(ctx, database.UpdateItemParams{
+		ID:          current.ID,
+		Title:       nullString(item.Title),
+		Link:        nullString(item.Link),
+		Guid:        item.GUID,
+		Pubdate:     nullString(item.PubDate),
+		Seeders:     nullInt32(item.Seeders),
+		Leechers:    nullInt32(item.Leechers),
+		Downloads:   nullInt32(item.Downloads),
+		Infohash:    nullString(item.InfoHash),
+		CategoryID:  nullString(item.CategoryID),
+		Category:    nullString(item.Category),
+		Size:        nullString(item.Size),
+		Comments:    nullInt32(item.Comments),
+		Trusted:     nullString(item.Trusted),
+		Remake:      nullString(item.Remake),
+		Description: nullString(item.Description),
+		UpdatedAt:   now,
+		ChannelID:   channelID,
+	})
+
+	if err != nil {
+		return database.Item{}, fmt.Errorf("updating item %s: %w", item.GUID, err)
+	}
+
+	return updated, nil
+}
+
+// FetchAndParseRSS fetches the nyaa.si feed for the given language and
+// resolution and stores its content.
+func FetchAndParseRSS(ctx context.Context,
+	fetchAndParseRSSRequest *FetchAndParseRSSRequest,
+	db *database.Queries) (database.Channel, []database.Item, error) {
+
+	feedURL := NyaaFeedURL(fetchAndParseRSSRequest)
+
+	rss, err := FetchRSS(ctx, nil, feedURL)
+	if err != nil {
+		return database.Channel{}, nil, err
+	}
+
+	return SyncFeed(ctx, db, "Nyaa", feedURL, rss)
+}
+
+// nullString maps an empty string to a NULL column value.
+func nullString(value string) sql.NullString {
+	if value == "" {
+		return sql.NullString{}
+	}
+
+	return sql.NullString{String: value, Valid: true}
+}
+
+func nullInt32(value int) sql.NullInt32 {
+	return sql.NullInt32{Int32: int32(value), Valid: true}
 }
