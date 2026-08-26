@@ -22,13 +22,13 @@ func (apiCfg *ApiConfig) HandlerNyaaRss() gin.HandlerFunc {
 		db_channel, items, err := rss.FetchAndParseRSS(c, fetchAndParseRSSRequest, apiCfg.queries)
 
 		if err != nil {
-			c.JSON(501, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"channel": db_channel,
-			"items":   models.DatabaseItemsToItems(*items),
+			"channel": models.DatabaseChannelToChannel(db_channel),
+			"items":   models.DatabaseItemsToItems(items),
 		})
 	}
 }

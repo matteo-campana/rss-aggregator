@@ -17,10 +17,20 @@ func (apiCfg *ApiConfig) RegisterRoutes() http.Handler {
 	routerGroup.GET("/", apiCfg.HelloWorldHandler())
 	routerGroup.GET("/health", apiCfg.HealthHandler())
 
-	// users
-	routerGroupUsers := routerGroup.Group("/users")
+	// registration is the only public users route: it is how a caller gets
+	// the API key every other route requires.
 
-	routerGroupUsers.POST("/", apiCfg.CreateUserHandler())
+	routerGroup.POST("/users/", apiCfg.CreateUserHandler())
+
+	// everything below requires `Authorization: ApiKey <key>`
+
+	authenticated := routerGroup.Group("")
+	authenticated.Use(MiddlewareAuth(apiCfg.queries))
+
+	// users
+	routerGroupUsers := authenticated.Group("/users")
+
+	routerGroupUsers.GET("/me", apiCfg.GetCurrentUserHandler())
 	routerGroupUsers.GET("/:id", apiCfg.GetUserHandler())
 	routerGroupUsers.GET("/", apiCfg.GetUsersHandler())
 	routerGroupUsers.PUT("/:id", apiCfg.UpdateUserHandler())
@@ -28,7 +38,7 @@ func (apiCfg *ApiConfig) RegisterRoutes() http.Handler {
 
 	// feeds
 
-	routerGroupFeeds := routerGroup.Group("/feeds")
+	routerGroupFeeds := authenticated.Group("/feeds")
 	routerGroupFeeds.POST("/", apiCfg.CreateFeedHandler())
 	routerGroupFeeds.GET("/:id", apiCfg.GetFeedHandler())
 	routerGroupFeeds.GET("/", apiCfg.GetFeedsHandler())
@@ -37,7 +47,7 @@ func (apiCfg *ApiConfig) RegisterRoutes() http.Handler {
 
 	// feed follows
 
-	routerGroupFeedFollows := routerGroup.Group("/feed-follows")
+	routerGroupFeedFollows := authenticated.Group("/feed-follows")
 
 	routerGroupFeedFollows.POST("/", apiCfg.CreateFeedFollowsHandler())
 	routerGroupFeedFollows.GET("/", apiCfg.GetFeedsFollowsHandler())
@@ -51,7 +61,7 @@ func (apiCfg *ApiConfig) RegisterRoutes() http.Handler {
 
 	// nyaa
 
-	routerGroupNyaa := routerGroup.Group("/nyaa")
+	routerGroupNyaa := authenticated.Group("/nyaa")
 	routerGroupNyaa.GET("/rss", apiCfg.HandlerNyaaRss())
 
 	return router

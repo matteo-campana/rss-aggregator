@@ -16,7 +16,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (id, created_at, updated_at, fullname, firstname, lastname, email)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, created_at, updated_at, fullname, firstname, lastname, email
+RETURNING id, created_at, updated_at, fullname, firstname, lastname, email, api_key
 `
 
 type CreateUserParams struct {
@@ -48,6 +48,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Firstname,
 		&i.Lastname,
 		&i.Email,
+		&i.ApiKey,
 	)
 	return i, err
 }
@@ -62,7 +63,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, created_at, updated_at, fullname, firstname, lastname, email FROM users WHERE id = $1
+SELECT id, created_at, updated_at, fullname, firstname, lastname, email, api_key FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
@@ -76,12 +77,33 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.Firstname,
 		&i.Lastname,
 		&i.Email,
+		&i.ApiKey,
+	)
+	return i, err
+}
+
+const getUserByApiKey = `-- name: GetUserByApiKey :one
+SELECT id, created_at, updated_at, fullname, firstname, lastname, email, api_key FROM users WHERE api_key = $1
+`
+
+func (q *Queries) GetUserByApiKey(ctx context.Context, apiKey string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByApiKey, apiKey)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Fullname,
+		&i.Firstname,
+		&i.Lastname,
+		&i.Email,
+		&i.ApiKey,
 	)
 	return i, err
 }
 
 const getUsers = `-- name: GetUsers :many
-SELECT id, created_at, updated_at, fullname, firstname, lastname, email FROM users
+SELECT id, created_at, updated_at, fullname, firstname, lastname, email, api_key FROM users
 `
 
 func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
@@ -101,6 +123,7 @@ func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
 			&i.Firstname,
 			&i.Lastname,
 			&i.Email,
+			&i.ApiKey,
 		); err != nil {
 			return nil, err
 		}
@@ -118,7 +141,7 @@ func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
 const updateUser = `-- name: UpdateUser :one
 UPDATE users SET updated_at = $2, fullname = $3, firstname = $4, lastname = $5, email = $6
 WHERE id = $1
-RETURNING id, created_at, updated_at, fullname, firstname, lastname, email
+RETURNING id, created_at, updated_at, fullname, firstname, lastname, email, api_key
 `
 
 type UpdateUserParams struct {
@@ -148,6 +171,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.Firstname,
 		&i.Lastname,
 		&i.Email,
+		&i.ApiKey,
 	)
 	return i, err
 }

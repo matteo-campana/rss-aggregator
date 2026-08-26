@@ -47,7 +47,7 @@ func DatabaseChannelToChannel(dbChannel database.Channel) Channel {
 }
 
 func DatabaseChannelsToChannels(dbChannels []database.Channel) []Channel {
-	var channels []Channel
+	channels := []Channel{}
 	for _, dbChannel := range dbChannels {
 		channels = append(channels, DatabaseChannelToChannel(dbChannel))
 	}

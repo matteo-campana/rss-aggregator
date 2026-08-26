@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "claude/**"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/rss-aggregator
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/rss-aggregator/go.mod
+          cache-dependency-path: backend/rss-aggregator/go.sum
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt'd:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./... -race -cover
+
+  migrations:
+    name: Migrations up/down
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: rss_aggregator
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DB_URL: postgres://postgres:postgres@localhost:5432/rss_aggregator?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/rss-aggregator/go.mod
+          cache-dependency-path: backend/rss-aggregator/go.sum
+
+      - name: Install goose
+        run: go install github.com/pressly/goose/v3/cmd/goose@v3.21.1
+
+      # Every migration has to be reversible: apply, roll back, apply again.
+      - name: Migrate up
+        run: goose -dir backend/rss-aggregator/sql/schema postgres "$DB_URL" up
+
+      - name: Migrate down
+        run: goose -dir backend/rss-aggregator/sql/schema postgres "$DB_URL" down-to 0
+
+      - name: Migrate up again
+        run: goose -dir backend/rss-aggregator/sql/schema postgres "$DB_URL" up
+
+      - name: Show final status
+        run: goose -dir backend/rss-aggregator/sql/schema postgres "$DB_URL" status

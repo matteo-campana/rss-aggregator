@@ -1,4 +1,6 @@
-include .env
+# .env is not versioned: copy .env.example and adjust it. The dash keeps every
+# target usable on a fresh clone, before the file exists.
+-include .env
 export
 
 # Build the application
@@ -81,7 +83,20 @@ sqlc-generate:
 # Test the application
 test:
 	@echo "Testing..."
-	@go test backend/rss-aggregator/tests -v
+	@cd backend/rss-aggregator && go test ./... -v
+
+test-cover:
+	@echo "Testing with coverage..."
+	@cd backend/rss-aggregator && go test ./... -race -cover
+
+# Static checks
+vet:
+	@cd backend/rss-aggregator && go vet ./...
+
+fmt:
+	@cd backend/rss-aggregator && gofmt -l .
+
+check: fmt vet test
 
 # Clean the binary
 clean:
@@ -105,4 +120,4 @@ watch:
 	    fi; \
 	fi
 
-.PHONY: all build run test clean
+.PHONY: all build build-dev build-prod run start docker-run docker-down migrate-up migrate-down migrate-reset sqlc-generate test test-cover vet fmt check clean watch

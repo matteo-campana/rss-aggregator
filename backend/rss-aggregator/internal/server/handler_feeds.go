@@ -18,7 +18,8 @@ func (apiCfg *ApiConfig) CreateFeedHandler() gin.HandlerFunc {
 		// parse and check the request parameters to create a new feed
 
 		type parameters struct {
-			Url string `json:"url"`
+			Url  string `json:"url"`
+			Name string `json:"name"`
 		}
 
 		decoder := json.NewDecoder(c.Request.Body)
@@ -37,8 +38,16 @@ func (apiCfg *ApiConfig) CreateFeedHandler() gin.HandlerFunc {
 			return
 		}
 
+		// feeds.name is NOT NULL UNIQUE: dropping it here left every feed with
+		// an empty name, so only the first one could ever be created.
+		if params.Name == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+			return
+		}
+
 		feed, err := apiCfg.queries.CreateFeed(c, database.CreateFeedParams{
 			Url:       params.Url,
+			Name:      params.Name,
 			CreatedAt: time.Now().UTC(),
 			UpdatedAt: time.Now().UTC(),
 			ID:        uuid.New(),
@@ -119,7 +128,8 @@ func (apiCfg *ApiConfig) UpdateFeedHandler() gin.HandlerFunc {
 		}
 
 		type parameters struct {
-			Url string `json:"url"`
+			Url  string `json:"url"`
+			Name string `json:"name"`
 		}
 
 		decoder := json.NewDecoder(c.Request.Body)
@@ -138,9 +148,17 @@ func (apiCfg *ApiConfig) UpdateFeedHandler() gin.HandlerFunc {
 			return
 		}
 
+		// UpdateFeed overwrites every column: without the name the update used
+		// to blank it out.
+		if params.Name == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+			return
+		}
+
 		feed, err := apiCfg.queries.UpdateFeed(c, database.UpdateFeedParams{
 			ID:        feedID_UUID,
 			Url:       params.Url,
+			Name:      params.Name,
 			UpdatedAt: time.Now().UTC(),
 		})
 

@@ -15,15 +15,22 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
+const defaultPort = 8080
+
 type ApiConfig struct {
 	queries *database.Queries
 	conn    *sql.DB
 	port    int
 }
 
-func NewServer() *http.Server {
+// NewApiConfig opens the database connection and builds the API configuration.
+func NewApiConfig() *ApiConfig {
 
-	port, _ := strconv.Atoi(os.Getenv("PORT"))
+	port, err := strconv.Atoi(os.Getenv("PORT"))
+	if err != nil || port <= 0 {
+		log.Printf("PORT is not a valid port number, falling back to %d", defaultPort)
+		port = defaultPort
+	}
 
 	var (
 		db_database = os.Getenv("DB_DATABASE")
@@ -41,22 +48,40 @@ func NewServer() *http.Server {
 		log.Fatal("Error connecting to DB: ", err)
 	}
 
-	queries := database.New(conn)
-
-	apiCfg := &ApiConfig{
-		queries: queries,
+	return &ApiConfig{
+		queries: database.New(conn),
 		conn:    conn,
 		port:    port,
 	}
+}
 
-	// Declare Server config
-	server := &http.Server{
+// Queries exposes the generated queries to the other components, the
+// background scraper in particular.
+func (apiCfg *ApiConfig) Queries() *database.Queries {
+	return apiCfg.queries
+}
+
+// Close releases the database connection.
+func (apiCfg *ApiConfig) Close() error {
+	if apiCfg.conn == nil {
+		return nil
+	}
+
+	return apiCfg.conn.Close()
+}
+
+// Server builds the HTTP server serving this configuration.
+func (apiCfg *ApiConfig) Server() *http.Server {
+	return &http.Server{
 		Addr:         fmt.Sprintf(":%d", apiCfg.port),
 		Handler:      apiCfg.RegisterRoutes(),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
+}
 
-	return server
+// NewServer builds a ready-to-serve HTTP server with its own configuration.
+func NewServer() *http.Server {
+	return NewApiConfig().Server()
 }

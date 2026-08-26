@@ -18,7 +18,11 @@ func (apiCfg *ApiConfig) HealthHandler() gin.HandlerFunc {
 		// Check the health of the database connection
 		stats := Health(apiCfg.conn)
 
-		// If the service is healthy:
+		if stats["status"] != "up" {
+			c.JSON(http.StatusServiceUnavailable, stats)
+			return
+		}
+
 		c.JSON(http.StatusOK, stats)
 	}
 }
@@ -31,12 +35,19 @@ func Health(db *sql.DB) map[string]string {
 
 	stats := make(map[string]string)
 
+	if db == nil {
+		stats["status"] = "down"
+		stats["error"] = "no database connection configured"
+		log.Print("health check: no database connection configured")
+		return stats
+	}
+
 	// Ping the database
 	err := db.PingContext(ctx)
 	if err != nil {
 		stats["status"] = "down"
 		stats["error"] = fmt.Sprintf("db down: %v", err)
-		log.Fatalf(fmt.Sprintf("db down: %v", err)) // Log the error and terminate the program
+		log.Printf("health check: db down: %v", err)
 		return stats
 	}
 

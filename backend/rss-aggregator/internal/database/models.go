@@ -23,11 +23,12 @@ type Channel struct {
 }
 
 type Feed struct {
-	ID        uuid.UUID
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Url       string
-	Name      string
+	ID            uuid.UUID
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	Url           string
+	Name          string
+	LastFetchedAt sql.NullTime
 }
 
 type FeedFollow struct {
@@ -68,4 +69,5 @@ type User struct {
 	Firstname sql.NullString
 	Lastname  sql.NullString
 	Email     sql.NullString
+	ApiKey    string
 }

@@ -56,9 +56,26 @@ func (apiCfg *ApiConfig) CreateUserHandler() gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusCreated, models.DatabaseUserToUser(user))
+		// The key is only returned here: it is the one chance the caller has
+		// to store it.
+		c.JSON(http.StatusCreated, models.DatabaseUserToUserWithApiKey(user))
 	}
 
+}
+
+// GetCurrentUserHandler returns the user the request authenticated as.
+func (apiCfg *ApiConfig) GetCurrentUserHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		user, ok := UserFromContext(c)
+
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+			return
+		}
+
+		c.JSON(http.StatusOK, models.DatabaseUserToUserWithApiKey(user))
+	}
 }
 
 func (apiCfg *ApiConfig) GetUsersHandler() gin.HandlerFunc {
