@@ -11,6 +11,18 @@ This particular RSS Aggregator is designed to fetch data from various RSS feeds 
 
 The requirements section lists the technologies needed to run the project. In this case, the project requires Go (specifically version 1.22) and Postgres (specifically version 16.3). These versions are likely the ones the project was developed and tested with, so using them would help ensure compatibility and smooth operation.
 
+## Getting Started
+
+```bash
+cp .env.example .env        # adjust the Postgres credentials if needed
+make docker-run             # start Postgres
+make migrate-up             # apply the schema (requires goose)
+make run                    # start the API on $PORT
+```
+
+Run the checks with `make check` (gofmt, `go vet`, unit tests). The unit tests need
+neither a database nor network access.
+
 ## Next Steps
 
 This project starts to extend the tutorial / crash course [Golang Web Server and RSS Scraper | Full Tutorial](https://www.youtube.com/watch?v=dpXhDzgUSe4). My goal is to create a complete RSS aggregator to aggregate the rss feeds from [**fitgirl-repacks**](https://fitgirl-repacks.site/), [**DODI-repacks**](https://dodi-repacks.site/), and [**Nyaa**](https://nyaa.si/) and retrieve data from SteamDB and AnimeDB to get the latest game and anime releases and help users find the latest content without having to visit multiple websites.
@@ -25,7 +37,7 @@ This project starts to extend the tutorial / crash course [Golang Web Server and
 - [x] Parse the fetched data and store it in a Postgres database
 - [x] Implement a REST API to retrieve the aggregated data
 - [ ] Refactor the code to improve readability and maintainability using the project [go-blueprint](https://github.com/Melkeydev/go-blueprint)
-- [ ] Write tests to ensure the program works as expected
+- [x] Write tests to ensure the program works as expected
 - [ ] Define a front-end interface to display the aggregated data (Angular or Next.js)
 - [ ] Add authentication and authorization to the REST API
 - [ ] Implement caching to improve performance (Redis?) (optional)
@@ -35,6 +47,6 @@ This project starts to extend the tutorial / crash course [Golang Web Server and
 - [ ] Optimize the program for scalability and efficiency (optional)
 - [ ] Add support for additional RSS feed formats and sources (optional)
 - [ ] Integrate with third-party services for additional functionality (optional)
-- [ ] Implement a CI/CD pipeline to automate testing and deployment
+- [ ] Implement a CI/CD pipeline to automate testing and deployment (testing done in `.github/workflows/ci.yml`, deployment still missing)
 - [ ] Deploy the project to a server for public access
 - [ ] Monitor the project for performance and stability (optional)
