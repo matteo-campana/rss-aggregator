@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -233,6 +234,7 @@ func upsertItem(ctx context.Context, db *database.Queries, channelID uuid.UUID, 
 	}
 
 	now := time.Now().UTC()
+	publishedAt := parsePubDate(item.PubDate)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		created, err := db.CreateItem(ctx, database.CreateItemParams{
@@ -241,6 +243,7 @@ func upsertItem(ctx context.Context, db *database.Queries, channelID uuid.UUID, 
 			Link:        nullString(item.Link),
 			Guid:        item.GUID,
 			Pubdate:     nullString(item.PubDate),
+			PublishedAt: publishedAt,
 			Seeders:     nullInt32(item.Seeders),
 			Leechers:    nullInt32(item.Leechers),
 			Downloads:   nullInt32(item.Downloads),
@@ -270,6 +273,7 @@ func upsertItem(ctx context.Context, db *database.Queries, channelID uuid.UUID, 
 		Link:        nullString(item.Link),
 		Guid:        item.GUID,
 		Pubdate:     nullString(item.PubDate),
+		PublishedAt: publishedAt,
 		Seeders:     nullInt32(item.Seeders),
 		Leechers:    nullInt32(item.Leechers),
 		Downloads:   nullInt32(item.Downloads),
@@ -306,6 +310,35 @@ func FetchAndParseRSS(ctx context.Context,
 	}
 
 	return SyncFeed(ctx, db, "Nyaa", feedURL, rss)
+}
+
+// pubDateLayouts are the layouts accepted for an RSS <pubDate>. nyaa.si serves a
+// numeric offset ("-0000"), which RFC1123 does not accept: it wants a zone name.
+var pubDateLayouts = []string{
+	time.RFC1123Z,
+	time.RFC1123,
+	time.RFC822Z,
+	time.RFC822,
+	time.RFC3339,
+}
+
+// parsePubDate turns the raw RSS date into a sortable timestamp. An unparsable
+// date leaves the column NULL rather than failing the whole item: the original
+// string is kept in pubdate either way.
+func parsePubDate(value string) sql.NullTime {
+	if value == "" {
+		return sql.NullTime{}
+	}
+
+	for _, layout := range pubDateLayouts {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			return sql.NullTime{Time: parsed.UTC(), Valid: true}
+		}
+	}
+
+	log.Printf("rss: cannot parse pubDate %q, leaving published_at empty", value)
+
+	return sql.NullTime{}
 }
 
 // nullString maps an empty string to a NULL column value.

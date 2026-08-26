@@ -59,6 +59,15 @@ func (apiCfg *ApiConfig) RegisterRoutes() http.Handler {
 	routerGroupFeedFollows.GET("/user/:user_id/feed/:feed_id", apiCfg.GetFeedFollowsByUserIdAndFeedIdHandler())
 	routerGroupFeedFollows.DELETE("/user/:user_id/feed/:feed_id", apiCfg.DeleteFeedFollowsByUserIdAndFeedIdHandler())
 
+	// items and channels: what the scraper has already stored
+
+	routerGroupItems := authenticated.Group("/items")
+
+	routerGroupItems.GET("/", apiCfg.ListItemsHandler())
+	routerGroupItems.GET("/categories", apiCfg.ListItemCategoriesHandler())
+
+	authenticated.GET("/channels/", apiCfg.GetChannelsHandler())
+
 	// nyaa
 
 	routerGroupNyaa := authenticated.Group("/nyaa")

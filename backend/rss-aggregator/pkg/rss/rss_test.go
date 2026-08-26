@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func loadSample(t *testing.T) *RSS {
@@ -154,5 +155,44 @@ func TestFetchRSSNonOKStatus(t *testing.T) {
 
 	if _, err := FetchRSS(context.Background(), server.Client(), server.URL); err == nil {
 		t.Fatal("FetchRSS on a 503 response: got nil error, want an error")
+	}
+}
+
+func TestParsePubDate(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  string
+		valid bool
+	}{
+		// The format nyaa.si actually serves: a numeric offset, which RFC1123
+		// alone does not accept.
+		{name: "nyaa", value: "Tue, 25 Jun 2024 10:15:00 -0000", want: "2024-06-25T10:15:00Z", valid: true},
+		{name: "named zone", value: "Tue, 25 Jun 2024 10:15:00 UTC", want: "2024-06-25T10:15:00Z", valid: true},
+		{name: "offset", value: "Tue, 25 Jun 2024 12:15:00 +0200", want: "2024-06-25T10:15:00Z", valid: true},
+		{name: "empty", value: ""},
+		{name: "garbage", value: "yesterday"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parsePubDate(tt.value)
+
+			if got.Valid != tt.valid {
+				t.Fatalf("valid = %t, want %t", got.Valid, tt.valid)
+			}
+
+			if tt.valid && got.Time.UTC().Format(time.RFC3339) != tt.want {
+				t.Errorf("time = %s, want %s", got.Time.UTC().Format(time.RFC3339), tt.want)
+			}
+		})
+	}
+}
+
+func TestParseRSSItemDateIsParsable(t *testing.T) {
+	rss := loadSample(t)
+
+	if got := parsePubDate(rss.Channel.Items[0].PubDate); !got.Valid {
+		t.Errorf("the fixture pubDate %q was not parsed", rss.Channel.Items[0].PubDate)
 	}
 }

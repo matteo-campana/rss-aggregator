@@ -32,6 +32,9 @@ func TestRegisterRoutes(t *testing.T) {
 		http.MethodGet + " /api/v1/feed-follows/",
 		http.MethodGet + " /api/v1/feed-follows/user/:user_id",
 		http.MethodGet + " /api/v1/nyaa/rss",
+		http.MethodGet + " /api/v1/items/",
+		http.MethodGet + " /api/v1/items/categories",
+		http.MethodGet + " /api/v1/channels/",
 	}
 
 	for _, route := range want {
@@ -68,6 +71,9 @@ func TestProtectedRoutesRejectAnonymousRequests(t *testing.T) {
 		"/api/v1/feeds/",
 		"/api/v1/feed-follows/",
 		"/api/v1/nyaa/rss",
+		"/api/v1/items/",
+		"/api/v1/items/categories",
+		"/api/v1/channels/",
 	}
 
 	for _, path := range protected {

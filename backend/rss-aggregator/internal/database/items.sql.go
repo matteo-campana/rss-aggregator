@@ -14,10 +14,10 @@ import (
 )
 
 const createItem = `-- name: CreateItem :one
-INSERT INTO items (id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id,
- category, size, comments, trusted, remake, description, created_at, updated_at, channel_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
-RETURNING id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id
+INSERT INTO items (id, title, link, guid, pubdate, published_at, seeders, leechers, downloads, infohash,
+ category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+RETURNING id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id, published_at
 `
 
 type CreateItemParams struct {
@@ -26,6 +26,7 @@ type CreateItemParams struct {
 	Link        sql.NullString
 	Guid        string
 	Pubdate     sql.NullString
+	PublishedAt sql.NullTime
 	Seeders     sql.NullInt32
 	Leechers    sql.NullInt32
 	Downloads   sql.NullInt32
@@ -49,6 +50,7 @@ func (q *Queries) CreateItem(ctx context.Context, arg CreateItemParams) (Item, e
 		arg.Link,
 		arg.Guid,
 		arg.Pubdate,
+		arg.PublishedAt,
 		arg.Seeders,
 		arg.Leechers,
 		arg.Downloads,
@@ -85,12 +87,13 @@ func (q *Queries) CreateItem(ctx context.Context, arg CreateItemParams) (Item, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ChannelID,
+		&i.PublishedAt,
 	)
 	return i, err
 }
 
 const getItemByChannelId = `-- name: GetItemByChannelId :many
-SELECT id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id FROM items WHERE channel_id = $1
+SELECT id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id, published_at FROM items WHERE channel_id = $1
 `
 
 func (q *Queries) GetItemByChannelId(ctx context.Context, channelID uuid.UUID) ([]Item, error) {
@@ -122,6 +125,7 @@ func (q *Queries) GetItemByChannelId(ctx context.Context, channelID uuid.UUID) (
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ChannelID,
+			&i.PublishedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -137,7 +141,7 @@ func (q *Queries) GetItemByChannelId(ctx context.Context, channelID uuid.UUID) (
 }
 
 const getItemByGuid = `-- name: GetItemByGuid :one
-SELECT id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id FROM items WHERE guid = $1
+SELECT id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id, published_at FROM items WHERE guid = $1
 `
 
 func (q *Queries) GetItemByGuid(ctx context.Context, guid string) (Item, error) {
@@ -163,12 +167,13 @@ func (q *Queries) GetItemByGuid(ctx context.Context, guid string) (Item, error) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ChannelID,
+		&i.PublishedAt,
 	)
 	return i, err
 }
 
 const getItemById = `-- name: GetItemById :one
-SELECT id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id FROM items WHERE id = $1
+SELECT id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id, published_at FROM items WHERE id = $1
 `
 
 func (q *Queries) GetItemById(ctx context.Context, id uuid.UUID) (Item, error) {
@@ -194,12 +199,13 @@ func (q *Queries) GetItemById(ctx context.Context, id uuid.UUID) (Item, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ChannelID,
+		&i.PublishedAt,
 	)
 	return i, err
 }
 
 const getItems = `-- name: GetItems :many
-SELECT id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id FROM items
+SELECT id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id, published_at FROM items
 `
 
 func (q *Queries) GetItems(ctx context.Context) ([]Item, error) {
@@ -231,6 +237,138 @@ func (q *Queries) GetItems(ctx context.Context) ([]Item, error) {
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ChannelID,
+			&i.PublishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listItemCategories = `-- name: ListItemCategories :many
+SELECT DISTINCT category FROM items
+WHERE category IS NOT NULL AND category <> ''
+ORDER BY category
+`
+
+func (q *Queries) ListItemCategories(ctx context.Context) ([]sql.NullString, error) {
+	rows, err := q.db.QueryContext(ctx, listItemCategories)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []sql.NullString
+	for rows.Next() {
+		var category sql.NullString
+		if err := rows.Scan(&category); err != nil {
+			return nil, err
+		}
+		items = append(items, category)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listItems = `-- name: ListItems :many
+SELECT id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id, published_at, COUNT(*) OVER() AS total_count FROM items
+WHERE ($1::text IS NULL OR title ILIKE '%' || $1::text || '%')
+  AND ($2::text IS NULL OR category = $2::text)
+  AND ($3::int IS NULL OR seeders >= $3::int)
+  AND ($4::uuid IS NULL OR channel_id = $4::uuid)
+ORDER BY
+  CASE WHEN $5::text = 'seeders' THEN seeders END DESC NULLS LAST,
+  CASE WHEN $5::text = 'oldest' THEN published_at END ASC NULLS LAST,
+  CASE WHEN $5::text = 'oldest' THEN created_at END ASC,
+  published_at DESC NULLS LAST,
+  created_at DESC
+LIMIT $7::int OFFSET $6::int
+`
+
+type ListItemsParams struct {
+	Search     sql.NullString
+	Category   sql.NullString
+	MinSeeders sql.NullInt32
+	ChannelID  uuid.NullUUID
+	Sort       string
+	PageOffset int32
+	PageSize   int32
+}
+
+type ListItemsRow struct {
+	ID          uuid.UUID
+	Title       sql.NullString
+	Link        sql.NullString
+	Guid        string
+	Pubdate     sql.NullString
+	Seeders     sql.NullInt32
+	Leechers    sql.NullInt32
+	Downloads   sql.NullInt32
+	Infohash    sql.NullString
+	CategoryID  sql.NullString
+	Category    sql.NullString
+	Size        sql.NullString
+	Comments    sql.NullInt32
+	Trusted     sql.NullString
+	Remake      sql.NullString
+	Description sql.NullString
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	ChannelID   uuid.UUID
+	PublishedAt sql.NullTime
+	TotalCount  int64
+}
+
+func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListItemsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listItems,
+		arg.Search,
+		arg.Category,
+		arg.MinSeeders,
+		arg.ChannelID,
+		arg.Sort,
+		arg.PageOffset,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListItemsRow
+	for rows.Next() {
+		var i ListItemsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Link,
+			&i.Guid,
+			&i.Pubdate,
+			&i.Seeders,
+			&i.Leechers,
+			&i.Downloads,
+			&i.Infohash,
+			&i.CategoryID,
+			&i.Category,
+			&i.Size,
+			&i.Comments,
+			&i.Trusted,
+			&i.Remake,
+			&i.Description,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ChannelID,
+			&i.PublishedAt,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}
@@ -246,11 +384,11 @@ func (q *Queries) GetItems(ctx context.Context) ([]Item, error) {
 }
 
 const updateItem = `-- name: UpdateItem :one
-UPDATE items SET title = $2, link = $3, guid = $4, pubdate = $5, seeders = $6, leechers = $7,
- downloads = $8, infohash = $9, category_id = $10, category = $11, size = $12, comments = $13,
- trusted = $14, remake = $15, description = $16, updated_at = $17, channel_id = $18
+UPDATE items SET title = $2, link = $3, guid = $4, pubdate = $5, published_at = $6, seeders = $7,
+ leechers = $8, downloads = $9, infohash = $10, category_id = $11, category = $12, size = $13,
+ comments = $14, trusted = $15, remake = $16, description = $17, updated_at = $18, channel_id = $19
 WHERE id = $1
-RETURNING id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id
+RETURNING id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id, published_at
 `
 
 type UpdateItemParams struct {
@@ -259,6 +397,7 @@ type UpdateItemParams struct {
 	Link        sql.NullString
 	Guid        string
 	Pubdate     sql.NullString
+	PublishedAt sql.NullTime
 	Seeders     sql.NullInt32
 	Leechers    sql.NullInt32
 	Downloads   sql.NullInt32
@@ -281,6 +420,7 @@ func (q *Queries) UpdateItem(ctx context.Context, arg UpdateItemParams) (Item, e
 		arg.Link,
 		arg.Guid,
 		arg.Pubdate,
+		arg.PublishedAt,
 		arg.Seeders,
 		arg.Leechers,
 		arg.Downloads,
@@ -316,6 +456,7 @@ func (q *Queries) UpdateItem(ctx context.Context, arg UpdateItemParams) (Item, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ChannelID,
+		&i.PublishedAt,
 	)
 	return i, err
 }

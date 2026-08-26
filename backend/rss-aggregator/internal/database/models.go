@@ -59,6 +59,7 @@ type Item struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	ChannelID   uuid.UUID
+	PublishedAt sql.NullTime
 }
 
 type User struct {
