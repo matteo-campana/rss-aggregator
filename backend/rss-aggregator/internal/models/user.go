@@ -71,3 +71,18 @@ func DatabaseUsersToUsers(dbUsers []database.User) []User {
 
 	return users
 }
+
+// DatabaseListUsersRowToUser maps a row of the paginated listing. It goes
+// through DatabaseUserToUser, so the API key stays out of the response.
+func DatabaseListUsersRowToUser(row database.ListUsersRow) User {
+	return DatabaseUserToUser(database.User{
+		ID:        row.ID,
+		CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
+		Fullname:  row.Fullname,
+		Firstname: row.Firstname,
+		Lastname:  row.Lastname,
+		Email:     row.Email,
+		ApiKey:    row.ApiKey,
+	})
+}

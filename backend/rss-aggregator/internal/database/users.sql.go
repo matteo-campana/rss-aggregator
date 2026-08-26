@@ -102,19 +102,38 @@ func (q *Queries) GetUserByApiKey(ctx context.Context, apiKey string) (User, err
 	return i, err
 }
 
-const getUsers = `-- name: GetUsers :many
-SELECT id, created_at, updated_at, fullname, firstname, lastname, email, api_key FROM users
+const listUsers = `-- name: ListUsers :many
+SELECT id, created_at, updated_at, fullname, firstname, lastname, email, api_key, COUNT(*) OVER() AS total_count FROM users
+ORDER BY created_at DESC
+LIMIT $2::int OFFSET $1::int
 `
 
-func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
-	rows, err := q.db.QueryContext(ctx, getUsers)
+type ListUsersParams struct {
+	PageOffset int32
+	PageSize   int32
+}
+
+type ListUsersRow struct {
+	ID         uuid.UUID
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	Fullname   string
+	Firstname  sql.NullString
+	Lastname   sql.NullString
+	Email      sql.NullString
+	ApiKey     string
+	TotalCount int64
+}
+
+func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUsers, arg.PageOffset, arg.PageSize)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []User
+	var items []ListUsersRow
 	for rows.Next() {
-		var i User
+		var i ListUsersRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CreatedAt,
@@ -124,6 +143,7 @@ func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
 			&i.Lastname,
 			&i.Email,
 			&i.ApiKey,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}

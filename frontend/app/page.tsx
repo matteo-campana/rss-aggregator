@@ -4,7 +4,7 @@ import { EmptyState } from "@/components/empty-state";
 import { FiltersBar } from "@/components/filters-bar";
 import { ItemsTable } from "@/components/items-table";
 import { Pagination } from "@/components/pagination";
-import { SignOutButton } from "@/components/sign-out-button";
+import { SiteHeader } from "@/components/site-header";
 import { ApiError, listCategories, listChannels, listItems } from "@/lib/api";
 import { parseFilters, type RawSearchParams } from "@/lib/search-params";
 import { getApiKey } from "@/lib/session";
@@ -54,17 +54,13 @@ export default async function ItemsPage({
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
-      <header className="flex items-baseline justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Aggregated items</h1>
-          <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-            {page.total.toLocaleString("en-US")} item{page.total === 1 ? "" : "s"} stored
-            {isFiltered ? " matching these filters" : ""}.
-          </p>
-        </div>
-
-        <SignOutButton />
-      </header>
+      <SiteHeader
+        title="Aggregated items"
+        subtitle={`${page.total.toLocaleString("en-US")} item${page.total === 1 ? "" : "s"} stored${
+          isFiltered ? " matching these filters" : ""
+        }.`}
+        current="items"
+      />
 
       <FiltersBar filters={filters} categories={categories} channels={channels} />
 

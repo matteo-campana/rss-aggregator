@@ -33,6 +33,22 @@ export type ItemsPage = {
   total: number;
 };
 
+export type Feed = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  url: string;
+  name: string;
+  last_fetched_at: string | null;
+};
+
+export type FeedsPage = {
+  feeds: Feed[];
+  page: number;
+  per_page: number;
+  total: number;
+};
+
 export type Channel = {
   id: string;
   created_at: string;

@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -109,12 +110,14 @@ func (q *Queries) GetFeedByUrl(ctx context.Context, url string) (Feed, error) {
 	return i, err
 }
 
-const getFeeds = `-- name: GetFeeds :many
+const getNextFeedsToFetch = `-- name: GetNextFeedsToFetch :many
 SELECT id, created_at, updated_at, url, name, last_fetched_at FROM feeds
+ORDER BY last_fetched_at ASC NULLS FIRST
+LIMIT $1
 `
 
-func (q *Queries) GetFeeds(ctx context.Context) ([]Feed, error) {
-	rows, err := q.db.QueryContext(ctx, getFeeds)
+func (q *Queries) GetNextFeedsToFetch(ctx context.Context, limit int32) ([]Feed, error) {
+	rows, err := q.db.QueryContext(ctx, getNextFeedsToFetch, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -143,21 +146,36 @@ func (q *Queries) GetFeeds(ctx context.Context) ([]Feed, error) {
 	return items, nil
 }
 
-const getNextFeedsToFetch = `-- name: GetNextFeedsToFetch :many
-SELECT id, created_at, updated_at, url, name, last_fetched_at FROM feeds
-ORDER BY last_fetched_at ASC NULLS FIRST
-LIMIT $1
+const listFeeds = `-- name: ListFeeds :many
+SELECT id, created_at, updated_at, url, name, last_fetched_at, COUNT(*) OVER() AS total_count FROM feeds
+ORDER BY name
+LIMIT $2::int OFFSET $1::int
 `
 
-func (q *Queries) GetNextFeedsToFetch(ctx context.Context, limit int32) ([]Feed, error) {
-	rows, err := q.db.QueryContext(ctx, getNextFeedsToFetch, limit)
+type ListFeedsParams struct {
+	PageOffset int32
+	PageSize   int32
+}
+
+type ListFeedsRow struct {
+	ID            uuid.UUID
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	Url           string
+	Name          string
+	LastFetchedAt sql.NullTime
+	TotalCount    int64
+}
+
+func (q *Queries) ListFeeds(ctx context.Context, arg ListFeedsParams) ([]ListFeedsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listFeeds, arg.PageOffset, arg.PageSize)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Feed
+	var items []ListFeedsRow
 	for rows.Next() {
-		var i Feed
+		var i ListFeedsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CreatedAt,
@@ -165,6 +183,7 @@ func (q *Queries) GetNextFeedsToFetch(ctx context.Context, limit int32) ([]Feed,
 			&i.Url,
 			&i.Name,
 			&i.LastFetchedAt,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}

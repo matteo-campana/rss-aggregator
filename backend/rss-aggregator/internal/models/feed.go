@@ -44,3 +44,17 @@ func DatabaseFeedsToFeeds(dbFeeds []database.Feed) []Feed {
 
 	return feeds
 }
+
+// DatabaseListFeedsRowToFeed maps a row of the paginated listing, which carries
+// the pagination total alongside the columns and so comes back as its own
+// generated type.
+func DatabaseListFeedsRowToFeed(row database.ListFeedsRow) Feed {
+	return DatabaseFeedToFeed(database.Feed{
+		ID:            row.ID,
+		CreatedAt:     row.CreatedAt,
+		UpdatedAt:     row.UpdatedAt,
+		Url:           row.Url,
+		Name:          row.Name,
+		LastFetchedAt: row.LastFetchedAt,
+	})
+}

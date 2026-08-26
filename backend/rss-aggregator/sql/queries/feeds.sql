@@ -1,9 +1,6 @@
 -- name: GetFeed :one
 SELECT * FROM feeds WHERE id = $1;
 
--- name: GetFeeds :many
-SELECT * FROM feeds;
-
 -- name: CreateFeed :one
 INSERT INTO feeds (id, created_at, updated_at, url, name)
 VALUES ($1, $2, $3, $4, $5)
@@ -33,3 +30,8 @@ UPDATE feeds
 SET last_fetched_at = NOW(), updated_at = NOW()
 WHERE id = $1
 RETURNING *;
+
+-- name: ListFeeds :many
+SELECT *, COUNT(*) OVER() AS total_count FROM feeds
+ORDER BY name
+LIMIT sqlc.arg('page_size')::int OFFSET sqlc.arg('page_offset')::int;

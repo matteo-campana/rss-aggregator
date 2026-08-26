@@ -1,5 +1,5 @@
 import { ItemFilters, toApiQuery } from "@/lib/search-params";
-import { Channel, ItemsPage, User } from "@/lib/types";
+import { Channel, FeedsPage, ItemsPage, User } from "@/lib/types";
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8080/api/v1";
 
@@ -41,6 +41,12 @@ export function getCurrentUser(apiKey: string): Promise<User> {
 
 export function listItems(apiKey: string, filters: ItemFilters): Promise<ItemsPage> {
   return request<ItemsPage>(`/items/?${toApiQuery(filters).toString()}`, apiKey);
+}
+
+export function listFeeds(apiKey: string, page: number, perPage: number): Promise<FeedsPage> {
+  const query = new URLSearchParams({ page: String(page), per_page: String(perPage) });
+
+  return request<FeedsPage>(`/feeds/?${query.toString()}`, apiKey);
 }
 
 export function listCategories(apiKey: string): Promise<string[]> {

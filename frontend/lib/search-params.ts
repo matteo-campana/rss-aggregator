@@ -87,9 +87,14 @@ export function toApiQuery(filters: ItemFilters): URLSearchParams {
 
 /**
  * Builds the query string for a link within the app. Defaults are left out so
- * the URL stays short and readable.
+ * the URL stays short and readable. basePath lets other listings — the feeds
+ * page — reuse the same pagination links.
  */
-export function toBrowserQuery(filters: ItemFilters, overrides: Partial<ItemFilters> = {}): string {
+export function toBrowserQuery(
+  filters: ItemFilters,
+  overrides: Partial<ItemFilters> = {},
+  basePath = "/",
+): string {
   const merged = { ...filters, ...overrides };
   const query = new URLSearchParams();
 
@@ -123,7 +128,7 @@ export function toBrowserQuery(filters: ItemFilters, overrides: Partial<ItemFilt
 
   const serialised = query.toString();
 
-  return serialised ? `/?${serialised}` : "/";
+  return serialised ? `${basePath}?${serialised}` : basePath;
 }
 
 export function totalPages(total: number, perPage: number): number {

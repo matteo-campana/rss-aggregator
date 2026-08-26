@@ -118,3 +118,17 @@ describe("totalPages", () => {
     expect(totalPages(total, perPage)).toBe(expected);
   });
 });
+
+describe("toBrowserQuery with a base path", () => {
+  it("keeps the feeds listing on its own page", () => {
+    expect(toBrowserQuery(parseFilters({}), { page: 3 }, "/feeds")).toBe("/feeds?page=3");
+  });
+
+  it("returns the bare path when nothing deviates from the defaults", () => {
+    expect(toBrowserQuery(parseFilters({}), {}, "/feeds")).toBe("/feeds");
+  });
+
+  it("still defaults to the item list", () => {
+    expect(toBrowserQuery(parseFilters({}), { page: 2 })).toBe("/?page=2");
+  });
+});

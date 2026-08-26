@@ -3,8 +3,8 @@ package server
 import (
 	"database/sql"
 	"net/http"
+	"net/url"
 	"strconv"
-	"strings"
 
 	"rss-aggregator/internal/database"
 	"rss-aggregator/internal/models"
@@ -14,9 +14,6 @@ import (
 )
 
 const (
-	defaultPageSize = 50
-	maxPageSize     = 200
-
 	sortRecent  = "recent"
 	sortSeeders = "seeders"
 	sortOldest  = "oldest"
@@ -31,37 +28,16 @@ type listItemsQuery struct {
 
 // parseListItemsQuery validates the query string. It is a pure function so the
 // validation can be tested without a database.
-func parseListItemsQuery(query map[string][]string) (listItemsQuery, error) {
+func parseListItemsQuery(query url.Values) (listItemsQuery, error) {
+	page, err := parsePagination(query)
+	if err != nil {
+		return listItemsQuery{}, err
+	}
+
+	parsed := listItemsQuery{page: page.page, perPage: page.perPage}
+
 	get := func(key string) string {
-		if values, ok := query[key]; ok && len(values) > 0 {
-			return strings.TrimSpace(values[0])
-		}
-
-		return ""
-	}
-
-	parsed := listItemsQuery{page: 1, perPage: defaultPageSize}
-
-	if raw := get("page"); raw != "" {
-		page, err := strconv.Atoi(raw)
-		if err != nil || page < 1 {
-			return listItemsQuery{}, &badRequestError{"page must be a positive integer"}
-		}
-
-		parsed.page = page
-	}
-
-	if raw := get("per_page"); raw != "" {
-		perPage, err := strconv.Atoi(raw)
-		if err != nil || perPage < 1 {
-			return listItemsQuery{}, &badRequestError{"per_page must be a positive integer"}
-		}
-
-		if perPage > maxPageSize {
-			perPage = maxPageSize
-		}
-
-		parsed.perPage = perPage
+		return queryValue(query, key)
 	}
 
 	sort := get("sort")
@@ -75,8 +51,8 @@ func parseListItemsQuery(query map[string][]string) (listItemsQuery, error) {
 
 	params := database.ListItemsParams{
 		Sort:       sort,
-		PageSize:   int32(parsed.perPage),
-		PageOffset: int32((parsed.page - 1) * parsed.perPage),
+		PageSize:   page.limit(),
+		PageOffset: page.offset(),
 	}
 
 	if search := get("search"); search != "" {
@@ -108,14 +84,6 @@ func parseListItemsQuery(query map[string][]string) (listItemsQuery, error) {
 	parsed.params = params
 
 	return parsed, nil
-}
-
-type badRequestError struct {
-	message string
-}
-
-func (e *badRequestError) Error() string {
-	return e.message
 }
 
 // itemResponse adds the source channel to the stored item.

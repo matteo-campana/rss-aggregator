@@ -65,16 +65,38 @@ func (apiCfg *ApiConfig) CreateFeedHandler() gin.HandlerFunc {
 func (apiCfg *ApiConfig) GetFeedsHandler() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
-		// get all feeds
 
-		feeds, err := apiCfg.queries.GetFeeds(c)
+		page, err := parsePagination(c.Request.URL.Query())
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, models.DatabaseFeedsToFeeds(feeds))
+		rows, err := apiCfg.queries.ListFeeds(c, database.ListFeedsParams{
+			PageSize:   page.limit(),
+			PageOffset: page.offset(),
+		})
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		total := int64(0)
+		feeds := make([]models.Feed, 0, len(rows))
+
+		for _, row := range rows {
+			total = row.TotalCount
+			feeds = append(feeds, models.DatabaseListFeedsRowToFeed(row))
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"feeds":    feeds,
+			"page":     page.page,
+			"per_page": page.perPage,
+			"total":    total,
+		})
 	}
 }
 

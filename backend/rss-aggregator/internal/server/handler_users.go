@@ -81,14 +81,37 @@ func (apiCfg *ApiConfig) GetCurrentUserHandler() gin.HandlerFunc {
 func (apiCfg *ApiConfig) GetUsersHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		users, err := apiCfg.queries.GetUsers(c)
+		page, err := parsePagination(c.Request.URL.Query())
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		rows, err := apiCfg.queries.ListUsers(c, database.ListUsersParams{
+			PageSize:   page.limit(),
+			PageOffset: page.offset(),
+		})
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, models.DatabaseUsersToUsers(users))
+		total := int64(0)
+		users := make([]models.User, 0, len(rows))
+
+		for _, row := range rows {
+			total = row.TotalCount
+			users = append(users, models.DatabaseListUsersRowToUser(row))
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"users":    users,
+			"page":     page.page,
+			"per_page": page.perPage,
+			"total":    total,
+		})
 	}
 
 }
