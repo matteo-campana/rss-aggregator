@@ -13,15 +13,25 @@ type Feed struct {
 	UpdatedAt time.Time `json:"updated_at"`
 	Url       string    `json:"url"`
 	Name      string    `json:"name"`
+	// LastFetchedAt is nil until the scraper refreshes the feed for the first time.
+	LastFetchedAt *time.Time `json:"last_fetched_at"`
 }
 
 func DatabaseFeedToFeed(dbFeed database.Feed) Feed {
+	var lastFetchedAt *time.Time
+
+	if dbFeed.LastFetchedAt.Valid {
+		lastFetchedAt = &dbFeed.LastFetchedAt.Time
+	}
+
 	return Feed{
 		ID:        dbFeed.ID,
 		CreatedAt: dbFeed.CreatedAt,
 		UpdatedAt: dbFeed.UpdatedAt,
 		Url:       dbFeed.Url,
 		Name:      dbFeed.Name,
+
+		LastFetchedAt: lastFetchedAt,
 	}
 }
 

@@ -23,6 +23,13 @@ make run                    # start the API on $PORT
 Run the checks with `make check` (gofmt, `go vet`, unit tests). The unit tests need
 neither a database nor network access.
 
+### Background scraper
+
+With `SCRAPER_ENABLED=true` the API also refreshes the stored feeds on its own,
+oldest first, every `SCRAPER_INTERVAL` (default `10m`) with `SCRAPER_CONCURRENCY`
+feeds in flight (default `3`). Items are upserted on their GUID, so re-fetching a
+feed updates seeders and leechers instead of duplicating rows.
+
 ## Next Steps
 
 This project starts to extend the tutorial / crash course [Golang Web Server and RSS Scraper | Full Tutorial](https://www.youtube.com/watch?v=dpXhDzgUSe4). My goal is to create a complete RSS aggregator to aggregate the rss feeds from [**fitgirl-repacks**](https://fitgirl-repacks.site/), [**DODI-repacks**](https://dodi-repacks.site/), and [**Nyaa**](https://nyaa.si/) and retrieve data from SteamDB and AnimeDB to get the latest game and anime releases and help users find the latest content without having to visit multiple websites.
