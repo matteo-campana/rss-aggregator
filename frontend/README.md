@@ -21,6 +21,8 @@ Sign in with the API key returned by `POST /api/v1/users/`.
   `searchParams`, so a filtered view can be linked and shared and no client-side store is needed.
   `lib/search-params.ts` holds the parsing and is covered by unit tests.
 - `middleware.ts` redirects to `/login` when the session cookie is missing.
+- `/feeds` lists the configured feeds and when the scraper last refreshed each one. It is
+  read-only: creating and editing feeds still happens through the API.
 
 ## Scripts
 
