@@ -69,4 +69,5 @@ type User struct {
 	Firstname sql.NullString
 	Lastname  sql.NullString
 	Email     sql.NullString
+	ApiKey    string
 }

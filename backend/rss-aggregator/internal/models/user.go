@@ -17,6 +17,20 @@ type User struct {
 	Email     string    `json:"email"`
 }
 
+// UserWithApiKey exposes the API key alongside the user. It is only served to
+// the owner of the key: registration and GET /users/me.
+type UserWithApiKey struct {
+	User
+	ApiKey string `json:"api_key"`
+}
+
+func DatabaseUserToUserWithApiKey(dbUser database.User) UserWithApiKey {
+	return UserWithApiKey{
+		User:   DatabaseUserToUser(dbUser),
+		ApiKey: dbUser.ApiKey,
+	}
+}
+
 func DatabaseUserToUser(dbUser database.User) User {
 
 	firstname := ""
