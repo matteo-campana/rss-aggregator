@@ -58,7 +58,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      GOOSE_DBSTRING: postgres://postgres:postgres@localhost:5432/rss_aggregator?sslmode=disable
+      DB_URL: postgres://postgres:postgres@localhost:5432/rss_aggregator?sslmode=disable
     steps:
       - uses: actions/checkout@v4
 
@@ -72,13 +72,13 @@ jobs:
 
       # Every migration has to be reversible: apply, roll back, apply again.
       - name: Migrate up
-        run: goose -dir backend/rss-aggregator/sql/schema postgres "$GOOSE_DBSTRING" up
+        run: goose -dir backend/rss-aggregator/sql/schema postgres "$DB_URL" up
 
       - name: Migrate down
-        run: goose -dir backend/rss-aggregator/sql/schema postgres "$GOOSE_DBSTRING" down-to 0
+        run: goose -dir backend/rss-aggregator/sql/schema postgres "$DB_URL" down-to 0
 
       - name: Migrate up again
-        run: goose -dir backend/rss-aggregator/sql/schema postgres "$GOOSE_DBSTRING" up
+        run: goose -dir backend/rss-aggregator/sql/schema postgres "$DB_URL" up
 
       - name: Show final status
-        run: goose -dir backend/rss-aggregator/sql/schema postgres "$GOOSE_DBSTRING" status
+        run: goose -dir backend/rss-aggregator/sql/schema postgres "$DB_URL" status
