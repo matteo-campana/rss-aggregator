@@ -140,12 +140,17 @@ func (q *Queries) GetItemByChannelId(ctx context.Context, channelID uuid.UUID) (
 	return items, nil
 }
 
-const getItemByGuid = `-- name: GetItemByGuid :one
-SELECT id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id, published_at FROM items WHERE guid = $1
+const getItemByChannelIdAndGuid = `-- name: GetItemByChannelIdAndGuid :one
+SELECT id, title, link, guid, pubdate, seeders, leechers, downloads, infohash, category_id, category, size, comments, trusted, remake, description, created_at, updated_at, channel_id, published_at FROM items WHERE channel_id = $1 AND guid = $2
 `
 
-func (q *Queries) GetItemByGuid(ctx context.Context, guid string) (Item, error) {
-	row := q.db.QueryRowContext(ctx, getItemByGuid, guid)
+type GetItemByChannelIdAndGuidParams struct {
+	ChannelID uuid.UUID
+	Guid      string
+}
+
+func (q *Queries) GetItemByChannelIdAndGuid(ctx context.Context, arg GetItemByChannelIdAndGuidParams) (Item, error) {
+	row := q.db.QueryRowContext(ctx, getItemByChannelIdAndGuid, arg.ChannelID, arg.Guid)
 	var i Item
 	err := row.Scan(
 		&i.ID,

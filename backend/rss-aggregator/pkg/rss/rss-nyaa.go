@@ -227,7 +227,12 @@ func getOrCreateChannel(ctx context.Context, db *database.Queries, feed database
 }
 
 func upsertItem(ctx context.Context, db *database.Queries, channelID uuid.UUID, item Item) (database.Item, error) {
-	current, err := db.GetItemByGuid(ctx, item.GUID)
+	// The GUID is only unique within its channel: the same torrent can legitimately
+	// appear in two feeds, and each keeps its own row.
+	current, err := db.GetItemByChannelIdAndGuid(ctx, database.GetItemByChannelIdAndGuidParams{
+		ChannelID: channelID,
+		Guid:      item.GUID,
+	})
 
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return database.Item{}, fmt.Errorf("looking up item %s: %w", item.GUID, err)

@@ -7,8 +7,8 @@ RETURNING *;
 -- name: GetItemById :one
 SELECT * FROM items WHERE id = $1;
 
--- name: GetItemByGuid :one
-SELECT * FROM items WHERE guid = $1;
+-- name: GetItemByChannelIdAndGuid :one
+SELECT * FROM items WHERE channel_id = $1 AND guid = $2;
 
 -- name: GetItemByChannelId :many
 SELECT * FROM items WHERE channel_id = $1;
